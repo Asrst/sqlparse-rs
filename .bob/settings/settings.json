@@ -1,23 +1,23 @@
 {
-    "approval": {
-        "allowed_permissions": [
-            "execute",
-            "read",
-            "todo",
-            "subtask",
-            "edit",
-            "subagent",
-            "mode",
-            "mcp",
-            "skill"
-        ],
-        "allowedExecutors": [
-            {
-                "toolId": "execute_command",
-                "approvedCommands": [
-                    "*"
-                ]
-            }
-        ]
-    }
+  "approval": {
+    "forbiddenApprovalGroups": [],
+    "allowed_permissions": [
+      "execute",
+      "read",
+      "write",
+      "todo",
+      "subtask",
+      "edit",
+      "subagent",
+      "mode",
+      "mcp",
+      "skill"
+    ],
+    "allowedExecutors": [
+      {
+        "toolId": "execute_command",
+        "approvedCommands": ["*"]
+      }
+    ]
+  }
 }
