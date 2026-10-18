@@ -1,6 +1,6 @@
 [package]
 name = "sqlparse-py"
-version = "0.1.0"
+version = "0.1.0-beta.1"
 edition = "2021"
 description = "PyO3 wrapper: drop-in accelerate sqlparse hot paths (tokenize, split)"
 license = "BSD-3-Clause"

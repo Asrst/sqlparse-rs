@@ -1,17 +1,36 @@
 """
-Compatibility tests against sqlparse.
-Each test asserts that sqlparse-rs produces the same result as the
-original sqlparse library.  Run with:
+Patch-mode compatibility tests against sqlparse.
+
+These tests exercise the EXPLICIT opt-in compatibility layer:
+`sqlparse_rs.patch()` redirects sqlparse's tokenize/parse/format to the
+Rust engine and `sqlparse_rs.unpatch()` restores the pure-Python engine.
+The fixture below opts in for every test in this module and undoes it
+afterwards, so the rest of the test session runs unpatched.
+
+The DEFAULT independence contract (importing sqlparse_rs must NOT touch
+sqlparse) is pinned separately in tests/test_independence.py.
+
+Run with:
 
     maturin develop && pytest tests/
 """
 import pytest
 
-# Import our Rust extension first — this patches sqlparse's lexer.
-import sqlparse_rs  # noqa: F401 (side-effect: installs Rust lexer patch)
+# Importing sqlparse_rs has NO side effects: sqlparse below is the genuine
+# pure-Python library until the fixture explicitly calls patch().
+import sqlparse_rs  # noqa: F401
 
-# sqlparse is the real library, now Rust-backed for tokenize/split.
+# sqlparse — the real library; Rust-backed only while the fixture's
+# patch() is active.
 import sqlparse as rs
+
+
+@pytest.fixture(autouse=True)
+def _rust_engine():
+    """Opt in to the Rust engine for each test; restore Python after."""
+    sqlparse_rs.patch()
+    yield
+    sqlparse_rs.unpatch()
 
 # ─── split ────────────────────────────────────────────────────────────────
 
@@ -224,12 +243,23 @@ def test_split_dollar_quoted():
 # ─── Rust patch verification ───────────────────────────────────────────────
 
 def test_rust_lexer_patch_active():
-    """sqlparse.lexer.Lexer.get_tokens must be our Rust implementation."""
+    """While patch() is active, Lexer.get_tokens must be our Rust implementation."""
     import sqlparse.lexer as lex
     fn = lex.Lexer.get_tokens
     assert '_get_tokens_rust' in fn.__qualname__ or 'rust' in fn.__qualname__.lower(), (
         f"Rust patch not active; get_tokens is: {fn.__qualname__}"
     )
+
+def test_unpatch_restores_python_engine():
+    """unpatch() must put the genuine pure-Python engine back in place."""
+    import sqlparse.lexer as lex
+    rust_get_tokens = lex.Lexer.get_tokens
+    assert 'rust' in rust_get_tokens.__qualname__.lower()
+    sqlparse_rs.unpatch()
+    try:
+        assert 'rust' not in lex.Lexer.get_tokens.__qualname__.lower()
+    finally:
+        sqlparse_rs.patch()  # re-opt-in for the fixture's symmetry
 
 def test_parse_uses_rust_tokenizer():
     """parse() should produce a Statement whose flatten() matches Rust tokenize()."""

@@ -30,9 +30,10 @@ gen-keywords:
 port-matrix:
 	$(PY) tools/dump_regex_table.py > PORT_MATRIX.md
 
-## Build the PyO3 extension into the active venv
+## Build the PyO3 extension into the active venv (mixed package layout:
+## run from repo root — root pyproject.toml sets python-source=python)
 build-py:
-	cd crates/sqlparse-py && maturin develop
+	maturin develop --release
 
 ## Python-side tests (wrapper + parity vs sqlparse)
 test-py: build-py
@@ -43,3 +44,30 @@ bench-py: $(INPUTS)
 
 clean:
 	rm -f $(INPUTS) $(GOLDENS)
+
+## Proof 1: python live-vs-live parity gate (writes tests/parity-report.md)
+proof-parity: build-py
+	$(PY) -m pytest tests/test_parity.py -q
+
+## Proof 1: regenerate dialect sweep + adversarial corpus records
+sweep:
+	$(PY) tools/gen_dialect_sweep.py corpus/sql
+	$(PY) tools/gen_adversarial.py corpus/sql
+
+## Proof 1: regenerate committed fuzz corpus (deterministic, seed 1337)
+fuzz:
+	$(PY) tools/gen_fuzz.py gen --count 2000 --seed 1337 --outdir corpus/fuzz
+fuzz-check:
+	$(PY) tools/gen_fuzz.py check --count 2000 --seed 1337
+
+## Proof 2: batch benchmarks (writes benchmarks/results.csv)
+bench: build-py
+	$(PY) benchmarks/bench.py
+
+## Proof 3: adversarial scaling plot (writes benchmarks/scaling.png)
+scaling: build-py
+	$(PY) benchmarks/scaling.py
+
+## Proof 4: downstream integration (writes tests/downstream-report.md)
+downstream: build-py
+	$(PY) tools/run_downstream.py

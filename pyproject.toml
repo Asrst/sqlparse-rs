@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "sqlparse-rs"
-version = "0.1.0"
+version = "0.1.0b1"
 description = "Drop-in Rust replacement for sqlparse — byte-identical tokenize and split, linear time"
 requires-python = ">=3.8"
 license = { text = "BSD-3-Clause" }

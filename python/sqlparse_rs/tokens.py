@@ -1,6 +1,7 @@
 # sqlparse_rs.tokens
-# Pure-Python _TokenType hierarchy — drop-in for sqlparse.tokens.
-# No dependency on sqlparse whatsoever.
+# Pure-Python _TokenType hierarchy — API-compatible with sqlparse.tokens.
+# Fully standalone: this module NEVER imports sqlparse, at import time or
+# any other time (pinned by tests/test_independence.py).
 #
 # _TokenType is a subclass of tuple; each node lazily creates children via
 # __getattr__ and stores them as attributes (cached after first access).
@@ -11,11 +12,12 @@
 #
 #     from sqlparse_rs.tokens import Keyword, DML, Whitespace
 #
-# or
-#
-#     from sqlparse import tokens as T
-#
 # works identically when sqlparse_rs.tokens is used as a drop-in.
+#
+# _TokenType object IDENTITY with sqlparse.tokens is only (optionally)
+# established inside sqlparse_rs.patch() — an explicit, user-driven action.
+# By default the two hierarchies are independent (structurally identical,
+# equal by value, distinct by identity).
 
 
 class _TokenType(tuple):

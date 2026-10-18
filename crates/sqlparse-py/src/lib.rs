@@ -6,40 +6,95 @@
 //!   format(sql, **opts) -> str                (fully in Rust)
 //!
 //! `parse()` builds the AST in Rust (tokenize → group) and returns native
-//! Python `sqlparse.sql.*` objects so callers can use the full sqlparse API
+//! `sqlparse_rs.sql.*` objects so callers can use the full sqlparse API
 //! (get_type, flatten, get_name, etc.) without any Python tokenization.
 //!
 //! `format()` is entirely in Rust — tokenize → optionally group → apply
 //! filters → serialize.  No Python code is called.
+//!
+//! Perf note (tokenize): ttype strings come from a fixed set of ~30 static
+//! names, so the Python string for each is built once per call and reused
+//! for every token; only the value strings are freshly allocated. This cuts
+//! tokenize() end-to-end time substantially on large inputs (2.79M-token
+//! dump: ~2s of str/tuple construction down to value-only allocation).
 
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyTuple};
+use pyo3::types::{PyDict, PyList, PyString, PyTuple};
 use pyo3::IntoPyObjectExt;
 
-use sqlparse_core::{self, grouping, formatter};
+use sqlparse_core::{self, formatter, grouping};
 
 // ──────────────────────────────────────────────────────────────────────────
-// tokenize / split  (Tier 1 + 2 — unchanged)
+// tokenize / split  (Tier 1 + 2 — fast wrapper, cached ttype PyStrings)
 // ──────────────────────────────────────────────────────────────────────────
+
+fn tokenize<'py>(py: Python<'py>, sql: &'py str) -> PyResult<Vec<Bound<'py, PyTuple>>> {
+    let mut cache: Vec<(&'static str, Bound<'py, PyString>)> = Vec::with_capacity(48);
+    let mut out = Vec::new();
+    for (t, v) in sqlparse_core::tokenize(sql) {
+        // linear scan over ~30 entries beats hashing per token
+        let tt = match cache.iter().find(|(name, _)| *name == t) {
+            Some((_, s)) => s.clone(),
+            None => {
+                let s = PyString::new(py, t);
+                cache.push((t, s.clone()));
+                s
+            }
+        };
+        out.push(PyTuple::new(py, [tt, PyString::new(py, v)])?);
+    }
+    Ok(out)
+}
+
+#[pyfunction(name = "tokenize")]
+fn py_tokenize<'a>(py: Python<'a>, sql: &'a str) -> PyResult<Vec<Bound<'a, PyTuple>>> {
+    tokenize(py, sql)
+}
 
 #[pyfunction]
-fn tokenize(sql: &str) -> Vec<(String, String)> {
-    sqlparse_core::tokenize(sql)
+#[pyo3(signature = (sql, strip_semicolon=false))]
+fn split(sql: &str, strip_semicolon: bool) -> Vec<String> {
+    if !strip_semicolon {
+        return sqlparse_core::split(sql)
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+    }
+    // python: FilterStack(strip_semicolon=True) removes ONE trailing ';'
+    // Punctuation token per statement, then str(stmt).strip(). Token-level
+    // strip keeps a ';'-terminated string literal intact.
+    sqlparse_core::splitter::split_tokens(sql)
         .into_iter()
-        .map(|(t, v)| (t.to_string(), v.to_string()))
+        .map(|mut toks| {
+            // Trailing ws/comment tokens ride inside the statement; python's
+            // filter stack still strips the ';' after them. Pop trailing
+            // ws-like tokens first, then ONE ';' Punctuation.
+            while let Some(last) = toks.last() {
+                if last.0 == sqlparse_core::ttype::PUNCTUATION && last.1 == ";" {
+                    toks.pop();
+                    break;
+                }
+                if last.0 == sqlparse_core::ttype::WHITESPACE
+                    || last.0 == sqlparse_core::ttype::NEWLINE
+                    || last.0 == sqlparse_core::ttype::COMMENT_SINGLE
+                    || last.0 == sqlparse_core::ttype::COMMENT_MULTILINE
+                {
+                    toks.pop();
+                    continue;
+                }
+                break;
+            }
+            let s: String = toks.into_iter().map(|(_, v)| v).collect();
+            s.trim().to_string()
+        })
         .collect()
 }
 
-#[pyfunction]
-fn split(sql: &str) -> Vec<String> {
-    sqlparse_core::split(sql)
-}
-
 // ──────────────────────────────────────────────────────────────────────────
-// parse  (Tier 3 — Rust grouping → Python sqlparse.sql objects)
+// parse  (Tier 3 — Rust grouping → Python sqlparse_rs.sql objects)
 // ──────────────────────────────────────────────────────────────────────────
 
-/// Build a Python `sqlparse.sql.Statement` tree from a pre-grouped Rust node.
+/// Build a Python `sqlparse_rs.sql.Statement` tree from a pre-grouped Rust node.
 fn node_to_py(py: Python<'_>, node: &grouping::Node) -> PyResult<PyObject> {
     use grouping::NodeKind;
 
@@ -47,14 +102,14 @@ fn node_to_py(py: Python<'_>, node: &grouping::Node) -> PyResult<PyObject> {
     let tok_mod  = py.import("sqlparse_rs.tokens")?;
 
     if node.is_leaf() {
-        // Leaf → sqlparse.sql.Token(ttype, value)
+        // Leaf → sql.Token(ttype, value)
         let ttype_str = node.ttype.unwrap_or("Token.Error");
         let ttype_obj = resolve_ttype(py, &tok_mod, ttype_str)?;
         let tok_cls = sql_mod.getattr("Token")?;
         return tok_cls.call1((ttype_obj, node.value.as_str()))?.into_py_any(py);
     }
 
-    // Group → appropriate sqlparse.sql.* class.
+    // Group → appropriate sql.* class.
     let cls_name = match node.kind {
         NodeKind::Statement      => "Statement",
         NodeKind::Identifier     => "Identifier",
@@ -87,7 +142,7 @@ fn node_to_py(py: Python<'_>, node: &grouping::Node) -> PyResult<PyObject> {
 }
 
 /// Resolve a ttype string like `"Token.Keyword.DML"` to the Python
-/// `sqlparse.tokens._TokenType` object.
+/// `sqlparse_rs.tokens._TokenType` object.
 fn resolve_ttype<'py>(
     _py: Python<'py>,
     tok_mod: &Bound<'py, PyModule>,
@@ -107,13 +162,26 @@ fn resolve_ttype<'py>(
 fn parse(py: Python<'_>, sql: &str, encoding: Option<&str>) -> PyResult<PyObject> {
     let _ = encoding; // encoding handled at tokenize level; UTF-8 already decoded by PyO3
 
-    // Split into individual statements first, then build AST for each.
-    let stmts_raw = sqlparse_core::split(sql);
-    // If split returns nothing, there may be one empty statement.
-    let stmts_sql: Vec<String> = if stmts_raw.is_empty() && !sql.trim().is_empty() {
-        vec![sql.to_owned()]
+    // Split into statement TOKEN LISTS (unstripped — leading/trailing
+    // whitespace stays inside its statement exactly like python's
+    // StatementSplitter), so `str(stmt)` round-trips the original SQL and
+    // token_first(skip_ws=False) sees the leading whitespace.
+    let stmt_toks = sqlparse_core::splitter::split_tokens(sql);
+    let stmts_toks: Vec<Vec<(String, String)>> = if stmt_toks.is_empty() && !sql.trim().is_empty() {
+        // Degenerate fallback: treat the whole input as one statement.
+        sqlparse_core::tokenize(sql)
+            .into_iter()
+            .map(|(t, v)| vec![(t.to_string(), v.to_string())])
+            .collect()
     } else {
-        stmts_raw
+        stmt_toks
+            .into_iter()
+            .map(|toks| {
+                toks.into_iter()
+                    .map(|(t, v)| (t.to_string(), v))
+                    .collect()
+            })
+            .collect()
     };
 
     // Handle edge case: empty input → single empty Statement.
@@ -125,12 +193,8 @@ fn parse(py: Python<'_>, sql: &str, encoding: Option<&str>) -> PyResult<PyObject
         return tup.into_py_any(py);
     }
 
-    let py_stmts: Vec<PyObject> = stmts_sql.iter().map(|s| -> PyResult<PyObject> {
-        let raw = sqlparse_core::tokenize(s);
-        let owned: Vec<(String, String)> = raw.into_iter()
-            .map(|(t, v)| (t.to_string(), v.to_string()))
-            .collect();
-        let mut stmt_node = grouping::tokens_to_statement(owned);
+    let py_stmts: Vec<PyObject> = stmts_toks.iter().map(|toks| -> PyResult<PyObject> {
+        let mut stmt_node = grouping::tokens_to_statement(toks.clone());
         grouping::group(&mut stmt_node);
         node_to_py(py, &stmt_node)
     }).collect::<PyResult<Vec<_>>>()?;
@@ -146,12 +210,12 @@ fn parse(py: Python<'_>, sql: &str, encoding: Option<&str>) -> PyResult<PyObject
 #[pyfunction]
 #[pyo3(signature = (sql, encoding=None, **options))]
 fn format(
-    py: Python<'_>,
+    _py: Python<'_>,
     sql: &str,
     encoding: Option<&str>,
     options: Option<&Bound<'_, PyDict>>,
 ) -> PyResult<String> {
-    let _ = (py, encoding);
+    let _ = encoding;
     let mut opts = formatter::FormatOptions::new();
 
     if let Some(opts_dict) = options {
@@ -255,7 +319,7 @@ fn parse_format_options(
 
 #[pymodule]
 fn sqlparse_rs(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(tokenize, m)?)?;
+    m.add_function(wrap_pyfunction!(py_tokenize, m)?)?;
     m.add_function(wrap_pyfunction!(split, m)?)?;
     m.add_function(wrap_pyfunction!(parse, m)?)?;
     m.add_function(wrap_pyfunction!(format, m)?)?;

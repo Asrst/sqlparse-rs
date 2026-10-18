@@ -54,6 +54,53 @@ fn first_word(value: &str) -> &str {
     value.split_whitespace().next().unwrap_or("")
 }
 
+/// Token-level statement splitting — what python's `StatementSplitter`
+/// actually yields to the formatter: raw token lists with NO stripping, so
+/// trailing whitespace/comment tokens stay inside their statement (e.g. the
+/// newline stored inside a trailing comment value must survive into the
+/// formatted output). The string-stripping behaviour is exclusive to the
+/// `split()` API (`str(stmt).strip()`).
+pub fn split_tokens(input: &str) -> Vec<Vec<(&'static str, String)>> {
+    let tokens = lexer::tokenize(input);
+    let mut out: Vec<Vec<(&'static str, String)>> = Vec::new();
+    let mut st = Splitter::default();
+
+    for &(ttype, value) in &tokens {
+        if st.consume_ws && !ttype::is_eos(ttype) {
+            let taken = std::mem::take(&mut st.tokens);
+            if !taken.iter().all(|(t, _)| ttype::is_ws_like(t)) {
+                out.push(taken);
+            }
+            st.reset();
+        }
+        st.level += st.change_splitlevel(ttype, value);
+        st.tokens.push((ttype, value.to_string()));
+
+        if ttype == ttype::PUNCTUATION && value == ";" {
+            st.seen_begin = false;
+            if st.level <= 0 && !st.block_stack.iter().any(|b| b == "BEGIN") {
+                st.consume_ws = true;
+            }
+        } else if ttype == ttype::KEYWORD && first_word(value) == "GO" {
+            st.consume_ws = true;
+        } else if !matches!(
+            ttype,
+            ttype::WHITESPACE | ttype::NEWLINE | ttype::COMMENT_SINGLE | ttype::COMMENT_MULTILINE
+        ) && !(ttype == ttype::KEYWORD && value.to_uppercase() == "BEGIN")
+        {
+            st.seen_begin = false;
+        }
+    }
+
+    if !st.tokens.is_empty() && !st.tokens.iter().all(|(t, _)| ttype::is_ws_like(t)) {
+        let taken = std::mem::take(&mut st.tokens);
+        if !taken.iter().all(|(t, _)| ttype::is_ws_like(t)) {
+            out.push(taken);
+        }
+    }
+    out
+}
+
 #[derive(Default)]
 struct Splitter {
     block_stack: Vec<String>,

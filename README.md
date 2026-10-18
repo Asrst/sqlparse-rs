@@ -1,7 +1,10 @@
 # sqlparse-rs
 
 A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0 exposed to Python
-via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a single import.
+via [PyO3](https://github.com/PyO3/pyo3) — a **standalone engine with the same API**. It has ZERO
+runtime dependency on `sqlparse`: the two packages install side by side, work independently, and
+`import sqlparse_rs` never touches `sqlparse`. Redirecting `sqlparse` itself to the Rust engine is
+an explicit, reversible opt-in: `sqlparse_rs.patch()` … `sqlparse_rs.unpatch()`.
 
 ## Status
 
@@ -9,10 +12,36 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a si
 |------|-----------|--------|
 | 1 | Lexer / tokenizer | ✅ Complete — 6.8× faster, byte-identical to sqlparse 0.6.0 |
 | 1 | Statement splitter (`split()`) | ✅ Complete — BEGIN/END blocks, GO, dollar-quotes |
-| 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
+| 2 | Opt-in `patch()` / `unpatch()` compat layer | ✅ Complete — explicit, reversible; never automatic |
 | 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens, grouping, and formatter |
 | 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; no Python grouping engine |
 | 3 | Own `sql` / `tokens` / `parsestream` | ✅ Complete — zero `sqlparse` runtime dependency |
+
+### Evidence — four banked proofs
+
+- **Proof 1 — correctness**: **2,040 records / 93,624 tokens, zero diffs** vs
+  real `sqlparse==0.6.0` for `tokenize` AND `split` — 40 corpus records
+  (traps, 9-dialect keyword sweep, issue601/issue39, 10k IN list, 10k
+  unclosed `$$`) + 2,000 fuzz statements (fuzz gate caught and fixed one real
+  bug: `%S` placeholder vs IGNORECASE). Gates: `cargo test` goldens +
+  live-vs-live `tests/test_parity.py` → `tests/parity-report.md`.
+- **Proof 2 — speed** (equal-work validated, sha256 stream checksums,
+  min-of-3): dump tokenize **5.7x** (8.8 MB / 2.79M tokens), dump split
+  **8.7x** (7,600 stmts), query-log fingerprint **4.9x** (100k queries).
+  End-to-end through the PyO3 tuple boundary; the pure-Rust scanner does
+  11.3 MB/s (~6.8x on the corpus bench). Details: `benchmarks/RESULTS.md`.
+- **Proof 3 — safety**: unclosed `$$` at 10 MB — Python 0.6.0 **DNFs
+  (>120 s)**, Rust finishes **linear** in 18.6 s; comment-only inputs linear
+  for both (~3x gap). No backtracking engine left in the hot path.
+  Visual: `benchmarks/scaling.png`.
+- **Proof 4 — downstream**: the upstream test suite (test_tokenize +
+  test_split, 120 tests) run against the explicit `sqlparse`→`sqlparse_rs`
+  alias shim (opt-in, `-p downstream_shim`) with
+  the FULL surface served by Rust: **120 passed / 0 failed** — tokenize,
+  split (incl. `strip_semicolon`), parse, isinstance checks, and
+  `str(statement)` round-trips, byte-identical. Unmodified downstream script
+  (`examples/statement_report.py`) byte-identical across engines.
+  Report: `tests/downstream-report.md`.
 
 ## Benchmark
 
@@ -291,8 +320,32 @@ sql.Comment        # comment block
 sql.Begin          # BEGIN...END block
 ```
 
-When `sqlparse` is installed, `import sqlparse_rs` also patches its lexer so
-`sqlparse.parse()` / `sqlparse.format()` use Rust automatically.
+## Independence by default (no patching)
+
+The two engines are separate packages with the same API. By default they
+never interact — `import sqlparse_rs` does not import, modify, or patch
+`sqlparse`, and `sqlparse` keeps running the genuine pure-Python engine.
+This is pinned by `tests/test_independence.py` (subprocess-isolated).
+
+```python
+import sqlparse        # pure-Python engine — untouched, still the oracle
+import sqlparse_rs     # Rust engine — fully independent
+
+# side-by-side comparison works out of the box:
+assert ([(str(t), v) for t, v in sqlparse.lexer.tokenize(sql)]
+        == list(sqlparse_rs.tokenize(sql)))
+
+# drop-in mode is an EXPLICIT, user-decided action:
+sqlparse_rs.patch()    # redirect sqlparse.tokenize/parse/format → Rust
+...                    # run foreign code that does `import sqlparse`
+sqlparse_rs.unpatch()  # restore the original pure-Python engine exactly
+```
+
+`patch()` is idempotent, is a no-op when `sqlparse` is absent, and is
+disabled by the `SQLPARSE_RS_NO_PATCH=1` environment variable. The Python
+`sqlparse` package itself is only a development/benchmark dependency here
+— it serves as the correctness oracle for the differential corpus and as
+the baseline in every benchmark.
 
 ---
 
@@ -301,8 +354,8 @@ When `sqlparse` is installed, `import sqlparse_rs` also patches its lexer so
 ```
 pyproject.toml                maturin build config (mixed Rust/Python layout)
 python/sqlparse_rs/
-  __init__.py               re-exports tokenize/split/parse/format/parsestream; optional patch
-  _patch.py                 optional monkey-patch of sqlparse.lexer.Lexer.get_tokens
+  __init__.py               re-exports tokenize/split/parse/format/parsestream + explicit patch/unpatch (no import side effects)
+  _patch.py                 EXPLICIT opt-in patch()/unpatch()/is_patched()/disabled() — never automatic
   _stream.py                native parsestream() — StatementSplitter + Rust grouping
   sql.py                    pure-Python AST node classes (no sqlparse dep)
   tokens.py                 pure-Python _TokenType hierarchy (no sqlparse dep)

@@ -1,0 +1,15 @@
+workload,engine,unit,value,note
+dump tokenize,python,s,12.599531823000007,8.8 MB
+dump tokenize,rust,s,2.304621786000098,8.8 MB
+dump tokenize,speedup,x,5.467071386523581,equal-work ok
+dump tokenize,python throughput,MB/s,0.6993933682451556,
+dump tokenize,rust throughput,MB/s,3.8236334714574403,
+dump split,python,s,17.34937864099993,7600 stmts
+dump split,rust,s,1.997729027000105,7600 stmts
+dump split,speedup,x,8.684550510362595,equal-work ok
+query-log fingerprint,python,s,25.921098677999908,100000 queries
+query-log fingerprint,rust,s,5.035689757,100000 queries
+query-log fingerprint,speedup,x,5.147477292851008,fingerprints equal
+freeze 10k IN format,python,error,0.0,upstream raises SQLParseError (Maximum number of tokens exceeded (10000).)
+freeze 4k IN format(reindent),python,s,0.924295377000135,"single run, cProfile"
+freeze: tokenize share,python,%,12.35045828861517,headroom a Tier 3 port would unlock

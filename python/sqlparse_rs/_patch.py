@@ -1,14 +1,52 @@
-# sqlparse_rs._patch
-# Monkey-patches sqlparse's lexer AND top-level parse/format to use Rust.
-# Safe to call multiple times (idempotent).
+# sqlparse_rs._patch — EXPLICIT opt-in compatibility layer.
+#
+# Calling sqlparse_rs.patch() monkey-patches sqlparse's lexer AND top-level
+# parse/format/parsestream to use Rust. Calling unpatch() restores the
+# original pure-Python engine exactly (attribute-granular, nothing left
+# behind).
+#
+# There is NO automatic patching anywhere in this package:
+#   * `import sqlparse_rs` never touches sqlparse (see tests/test_independence.py).
+#   * patch() only runs when YOU call it.
+#
+# Safety valves:
+#   * patch() is a no-op when sqlparse is not installed.
+#   * Set SQLPARSE_RS_NO_PATCH=1 to make patch() a no-op (useful for A/B
+#     comparison scripts that inherit a patched environment).
+#   * `disabled()` is a context manager that temporarily restores the
+#     pure-Python engine (used by the differential/benchmark harnesses so
+#     the Python side of a Python-vs-Rust comparison stays genuinely
+#     Python even while the patch is active in the same interpreter).
+#   * `is_patched()` reports whether the patch is currently installed.
+
+import contextlib
+import os
 
 _INSTALLED = False
+_ORIGINALS: dict = {}
 
 
-def install():
-    """Patch sqlparse so tokenize/parse/format all call Rust instead of Python."""
+def is_patched():
+    """True while sqlparse's engine is redirected to Rust."""
+    return _INSTALLED
+
+
+def patch():
+    """EXPLICITLY redirect sqlparse's tokenize/parse/format to Rust.
+
+    Idempotent. No-op if sqlparse is not installed or if the
+    SQLPARSE_RS_NO_PATCH environment variable is set.
+
+    Also shares sqlparse's _TokenType singletons into sqlparse_rs.tokens
+    (one-way, so `ttype is T.Keyword` identity checks hold across engines
+    while the patch is active). Sharing is not reverted by unpatch(): the
+    two hierarchies are structurally identical and code that already holds
+    references must stay valid.
+    """
     global _INSTALLED
     if _INSTALLED:
+        return
+    if os.environ.get("SQLPARSE_RS_NO_PATCH"):
         return
 
     try:
@@ -18,6 +56,19 @@ def install():
     except ImportError:
         # sqlparse not installed — nothing to patch
         return
+
+    # Snapshot the original Python engine so unpatch() can restore it
+    # exactly (attribute-granular, nothing left behind).
+    _ORIGINALS.clear()
+    _ORIGINALS["lexer.get_tokens"] = (_lex_mod.Lexer, "get_tokens",
+                                      _lex_mod.Lexer.__dict__.get("get_tokens"))
+    _ORIGINALS["lexer.add_keywords"] = (_lex_mod.Lexer, "add_keywords",
+                                        _lex_mod.Lexer.__dict__.get("add_keywords"))
+    _ORIGINALS["lexer.tokenize"] = (_lex_mod, "tokenize", _lex_mod.__dict__.get("tokenize"))
+    _ORIGINALS["sqlparse.parse"] = (_sqlparse, "parse", _sqlparse.__dict__.get("parse"))
+    _ORIGINALS["sqlparse.format"] = (_sqlparse, "format", _sqlparse.__dict__.get("format"))
+    _ORIGINALS["sqlparse.parsestream"] = (_sqlparse, "parsestream",
+                                          _sqlparse.__dict__.get("parsestream"))
 
     from sqlparse_rs.sqlparse_rs import (
         tokenize as _rust_tokenize_raw,
@@ -102,6 +153,7 @@ def install():
     try:
         import sqlparse.engine.filter_stack as _fs
         import sqlparse.lexer  # ensure it's the real module
+        _ORIGINALS["filter_stack.lexer"] = (_fs, "lexer", _fs.__dict__.get("lexer"))
         _fs.lexer = sqlparse.lexer  # repoint to patched module
     except Exception:
         pass
@@ -128,4 +180,55 @@ def install():
 
     _sqlparse.parsestream = _native_parsestream
 
+    # ── Token singleton sharing (moved out of tokens.py) ──────────────────
+    # Only happens on EXPLICIT patch(): rebind sqlparse_rs.tokens' public
+    # aliases to sqlparse's _TokenType objects so identity checks hold
+    # across engines. One-way; see patch() docstring.
+
+    import sqlparse_rs.tokens as _rs_tokens
+
+    for _name in dir(_T):
+        if not _name.startswith("_"):
+            setattr(_rs_tokens, _name, getattr(_T, _name))
+
     _INSTALLED = True
+
+
+def unpatch():
+    """Restore the original pure-Python sqlparse engine (no-op if not patched)."""
+    global _INSTALLED
+    if not _INSTALLED:
+        return
+    for _owner, _name, _orig in _ORIGINALS.values():
+        if _orig is not None:
+            setattr(_owner, _name, _orig)
+        else:
+            try:
+                delattr(_owner, _name)
+            except AttributeError:
+                pass
+    _ORIGINALS.clear()
+    _INSTALLED = False
+
+
+# Backwards-compatible aliases (the layer used to be install()/uninstall()).
+install = patch
+uninstall = unpatch
+
+
+@contextlib.contextmanager
+def disabled():
+    """Context manager: temporarily restore the pure-Python engine.
+
+    Used by the differential/benchmark harnesses so the Python side of a
+    Python-vs-Rust comparison is genuinely Python even when the explicit
+    patch is active in the same interpreter. No-op when patch() was never
+    called (the default).
+    """
+    was_installed = _INSTALLED
+    unpatch()
+    try:
+        yield
+    finally:
+        if was_installed:
+            patch()

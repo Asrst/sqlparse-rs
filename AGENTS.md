@@ -4,9 +4,9 @@ This file provides guidance to agents when working with code in this repository.
 
 ## Project
 
-Rust + Python hybrid: a drop-in replacement for [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0.
+Rust + Python hybrid: a standalone engine for [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0 workloads.
 **Mixed maturin layout**: the `.so` (`sqlparse_rs`) + the `python/sqlparse_rs/` package are installed together.
-`import sqlparse_rs` automatically patches `sqlparse.lexer.Lexer.get_tokens` so all sqlparse operations use Rust.
+**Independence by default**: `import sqlparse_rs` NEVER touches `sqlparse` (no import, no patch). The two engines coexist; `sqlparse` is used only by the benchmark/differential tooling as the oracle and baseline. Redirecting sqlparse's engine to Rust is an explicit user action: `sqlparse_rs.patch()` / `sqlparse_rs.unpatch()` (see `python/sqlparse_rs/_patch.py`).
 
 ## Commands
 
@@ -29,7 +29,7 @@ make gen-keywords                                              # regenerate crat
 - **`source "$HOME/.cargo/env"` every shell** — Rust toolchain is not on PATH by default in this devcontainer.
 - **`maturin develop` must be run from the repo root** — the root `pyproject.toml` has `manifest-path = "crates/sqlparse-py/Cargo.toml"` and `python-source = "python"`.
 - **Mixed layout**: `python/sqlparse_rs/__init__.py` + `python/sqlparse_rs/_patch.py` are the Python half; the `.so` lands at `python/sqlparse_rs/sqlparse_rs.cpython-*.so`. Import as `sqlparse_rs.sqlparse_rs` internally, or just `sqlparse_rs` (the package `__init__` re-exports everything).
-- **Patch must fire before first `import sqlparse`** — `import sqlparse_rs` installs the lexer patch. In tests this is done at the top of `test_compat.py`. In apps, add `import sqlparse_rs` to the entry-point.
+- **Patching is explicit and opt-in** — `import sqlparse_rs` does NOT patch sqlparse. To serve `import sqlparse` from Rust, the user calls `sqlparse_rs.patch()` (reversible via `unpatch()`; `SQLPARSE_RS_NO_PATCH=1` is a kill-switch). In tests this is done by the autouse fixture in `test_compat.py`. The independence contract is pinned by `tests/test_independence.py` — keep both green.
 - **`keywords.rs` is GENERATED** — do not hand-edit it. Run `make gen-keywords` (requires the real `sqlparse` installed in the venv) to regenerate from the live keyword dicts.
 - **Golden files are the compat referee**. When sqlparse behaviour is ambiguous, run `python tools/oracle.py tokenize` or `python tools/oracle.py split` against real sqlparse — never guess. `corpus/inputs.bin` is NOT committed; regenerate with `make corpus`.
 - **Differential tests skip, not fail, when goldens are absent** — `cargo test` stays green before golden setup.

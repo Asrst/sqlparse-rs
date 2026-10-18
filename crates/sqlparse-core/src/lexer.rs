@@ -384,12 +384,19 @@ fn pct_placeholder(ch: &[char], pos: usize) -> Option<usize> {
         while k < n && is_word_char(ch[k]) {
             k += 1;
         }
-        if k > j + 1 && k < n && ch[k] == ')' && k + 1 < n && ch[k + 1] == 's' {
+        // trailing s is case-insensitive (table compiles with IGNORECASE):
+        // %SET must split as Placeholder "%S" + Name "ET" (fuzz regression)
+        if k > j + 1
+            && k < n
+            && ch[k] == ')'
+            && k + 1 < n
+            && (ch[k + 1] == 's' || ch[k + 1] == 'S')
+        {
             return Some(k + 2);
         }
         return None; // group present but unusable; absent group needs 's' at '('
     }
-    if j < n && ch[j] == 's' {
+    if j < n && (ch[j] == 's' || ch[j] == 'S') {
         return Some(j + 1);
     }
     None

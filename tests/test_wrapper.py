@@ -7,7 +7,12 @@ import sqlparse.lexer  # noqa: E402
 
 
 def py_tokens(sql):
-    return [(str(t), v) for t, v in sqlparse.lexer.tokenize(sql)]
+    # disabled(): restore the genuine Python lexer for the oracle side, so
+    # the comparison below is Python vs Rust even when the sqlparse_rs
+    # auto-patch is active in this interpreter (e.g. after test_compat ran).
+    from sqlparse_rs import _patch as rs_patch
+    with rs_patch.disabled():
+        return [(str(t), v) for t, v in sqlparse.lexer.tokenize(sql)]
 
 
 CASES = [

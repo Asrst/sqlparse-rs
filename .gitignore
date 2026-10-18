@@ -6,3 +6,5 @@ corpus/inputs.bin
 corpus/keywords-manifest.txt
 Cargo.lock.bak
 *.zip
+*.so
+python/sqlparse_rs/*.so
