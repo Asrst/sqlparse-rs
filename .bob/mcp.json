@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "crates-io": {
+      "command": "npx",
+      "args": ["-y", "@pipeworx/mcp-crates@0.1.2"],
+      "disabled": false
+    },
+    "fetcher": {
+      "command": "npx",
+      "args": ["-y", "fetcher-mcp"],
+      "disabled": false
+    }
+  }
+}

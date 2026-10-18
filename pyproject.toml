@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "sqlparse-rs"
+version = "0.1.0"
+description = "Drop-in Rust replacement for sqlparse"
+requires-python = ">=3.8"
+license = {text = "BSD-3-Clause"}
+keywords = ["sql", "parser", "formatter"]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "sqlparse"]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "sqlparse._rust"
+python-source = "python"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
