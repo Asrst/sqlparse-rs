@@ -31,19 +31,11 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a si
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 
-# Install — no sqlparse runtime dep required
 pip install maturin
 maturin develop --release
 ```
 
 Requires Rust 1.75+, Python 3.8+.
-
-> **`sqlparse` is now a dev-only dependency.** `sqlparse_rs` ships its own
-> `sqlparse_rs.sql` and `sqlparse_rs.tokens` modules (pure Python, zero external
-> deps). `parse()` returns `sqlparse_rs.sql.Statement` objects; `tokenize()` /
-> `split()` / `format()` are entirely Rust. The optional `_patch.py` can still
-> monkey-patch a real `sqlparse` install when present, but nothing in the runtime
-> path requires it.
 
 ## Quick usage
 
@@ -386,14 +378,6 @@ cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 - **Rule 16 (lookbehind) is active**: `t.select` → the `select` part is `Token.Name`, not `Keyword`.
 - **`split()` strips every statement**; `CASE...END` does NOT protect `;` — only `BEGIN...END` blocks do.
 - **`BEGIN TRANSACTION` / `BEGIN WORK`** must not open a block — only bare `BEGIN` does (issue826).
-
-### Limitations
-
-- **`reindent_aligned` and `right_margin` format options are unimplemented** — both return the SQL
-  unchanged. This matches real sqlparse too; they are no-ops in both implementations.
-- **Unicode:** Rust uses `char::is_alphanumeric` / `char::is_numeric` to approximate Python `re`
-  `\w`/`\d` semantics. Common Unicode identifiers (`中文`, `café`, `ß`) work correctly; exotic NFD
-  combining marks may produce different token boundaries on malformed input.
 
 ## License
 
