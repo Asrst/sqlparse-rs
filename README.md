@@ -6,7 +6,7 @@
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 [![Typed](https://img.shields.io/badge/typing-py.typed-informational)](python/sqlparse_rs/py.typed)
 
-A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0, exposed to Python via [PyO3](https://github.com/PyO3/pyo3). It is a **complete, standalone SQL engine** with the same public API as sqlparse — no runtime dependency on the Python library.
+A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0, exposed to Python via [PyO3](https://github.com/PyO3/pyo3). It is a **complete, standalone SQL engine** with the same public API as sqlparse
 
 `import sqlparse_rs` never touches sqlparse. The two packages install side by side, run independently, and you can compare them directly in the same interpreter. Redirecting sqlparse to the Rust engine is a deliberate opt-in: `sqlparse_rs.patch()` and `sqlparse_rs.unpatch()`.
 
@@ -76,6 +76,25 @@ Raw data in `benchmarks/results.csv` and `benchmarks/scaling.csv`. Chart in `ben
 
 ## Installation
 
+### From a GitHub Release (no Rust required)
+
+Pre-built wheels are attached to every [GitHub Release](https://github.com/Asrst/sqlparse-rs/releases). Requires **Python 3.11+**; no Rust toolchain needed.
+
+```bash
+# Latest beta (v0.1.0b1) — Linux x86_64, CPython 3.11+
+pip install "https://github.com/Asrst/sqlparse-rs/releases/download/v0.1.0b1/sqlparse_rs-0.1.0b1-cp311-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+```
+
+The exact filename for each release is listed on the [Releases page](https://github.com/Asrst/sqlparse-rs/releases). For other platforms, download the matching `.whl` from there and run:
+
+```bash
+pip install sqlparse_rs-<version>-<platform>.whl
+```
+
+### From source (development build)
+
+Requires **Rust 1.75+** and **Python 3.11+**.
+
 ```bash
 # Rust toolchain (skip if already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -84,8 +103,6 @@ source "$HOME/.cargo/env"
 pip install maturin
 maturin develop --release
 ```
-
-Requires **Rust 1.75+** and **Python 3.11+**.
 
 ---
 
