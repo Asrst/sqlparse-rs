@@ -1,0 +1,36 @@
+{
+  "name": "Semetric Dev",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12-trixie",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "latest"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests/"],
+        "editor.formatOnSave": true,
+        "ruff.lintOnSave": true,
+        "ruff.organizeImports": true,
+        "[python]": {
+          "editor.codeActionsOnSave": {
+            "source.organizeImports.ruff": "explicit"
+          }
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "GitHub.copilot",
+        "charliermarsh.ruff",
+        "ms-python.pyright",
+        "Vervious.vscode-yaml-sorted",
+        "ms-vscode.powershell"
+      ]
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh"
+}
