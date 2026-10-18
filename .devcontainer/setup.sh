@@ -6,22 +6,23 @@ WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$WORKSPACE_ROOT"
 
-# Install opencode globally via npm
-npm install -g opencode-ai
+# Install Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+source "$HOME/.cargo/env"
+rustup show
 
-# Install IBM Bob Shell
-curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --package-manager npm
-bob --version
+# Create Python venv and install dev dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install maturin pytest "sqlparse==0.6.0"
 
-# Verify opencode
-opencode --version
+# Build the Rust extension and install into the venv
+maturin develop
 
-# Sync workspace (dev deps included by default in sync)
-uv sync
-
-# Install semetric to system Python so semetric CLI is globally available
-# --system installs to system Python instead of workspace venv
-# --break-system-packages allows installing into the system environment
-uv pip install --system --break-system-packages -e .
-
+echo ""
 echo "Dev environment ready."
+echo "  source \"\$HOME/.cargo/env\"   # activate Rust toolchain"
+echo "  source .venv/bin/activate     # activate Python venv"
+echo "  maturin develop               # rebuild after Rust changes"
+echo "  pytest tests/ -v              # run all tests"

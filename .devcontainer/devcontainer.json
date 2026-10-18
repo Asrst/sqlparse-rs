@@ -1,34 +1,31 @@
 {
-  "name": "Semetric Dev",
+  "name": "sqlparse-rs",
   "image": "mcr.microsoft.com/devcontainers/python:3.12-trixie",
-  "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24"
-    }
-  },
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": ["tests/"],
         "editor.formatOnSave": true,
-        "ruff.lintOnSave": true,
-        "ruff.organizeImports": true,
+        "rust-analyzer.cargo.features": "all",
         "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
           "editor.codeActionsOnSave": {
             "source.organizeImports.ruff": "explicit"
           }
+        },
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
         }
       },
       "extensions": [
+        "rust-lang.rust-analyzer",
+        "tamasfe.even-better-toml",
         "ms-python.python",
         "ms-python.vscode-pylance",
-        "GitHub.copilot",
         "charliermarsh.ruff",
-        "ms-python.pyright",
-        "Vervious.vscode-yaml-sorted",
-        "ms-vscode.powershell"
+        "ms-python.pyright"
       ]
     }
   },
