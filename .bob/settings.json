@@ -1,40 +1,5 @@
 {
   "tools": {
     "allowed": ["run_shell_command"]
-  },
-  "approval": {
-    "forbiddenApprovalGroups": [],
-    "allowed_permissions": [
-      "execute",
-      "read",
-      "write",
-      "todo",
-      "subtask",
-      "edit",
-      "subagent",
-      "mode",
-      "mcp",
-      "skill"
-    ],
-    "allowedExecutors": [
-      {
-        "toolId": "execute_command",
-        "approvedCommands": ["*"]
-      }
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "^execute_command$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .bob/hooks/auto-approve.mjs",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
   }
 }
