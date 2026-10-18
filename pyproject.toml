@@ -12,7 +12,15 @@ keywords = ["sql", "parser", "formatter", "rust"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Database",
+    "Typing :: Typed",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +30,10 @@ dev = ["pytest", "sqlparse>=0.4,<0.7"]
 manifest-path = "crates/sqlparse-py/Cargo.toml"
 module-name = "sqlparse_rs"
 python-source = "python"
+# Include the py.typed PEP 561 marker so type-checkers recognise the package.
+include = [
+    { path = "python/sqlparse_rs/py.typed", format = "wheel" },
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

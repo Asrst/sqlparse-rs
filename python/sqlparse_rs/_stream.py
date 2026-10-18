@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import Generator, IO
 
+__all__ = ["parsestream"]
+
 from sqlparse_rs import tokens as T
 from sqlparse_rs import sql as sql_mod
 from sqlparse_rs.sqlparse_rs import tokenize as _rust_tokenize, parse as _rust_parse

@@ -87,3 +87,35 @@ Comment     = Token.Comment
 Assignment  = Token.Assignment
 Other       = Token.Other
 Generic     = Token.Generic
+
+__all__ = [
+    "_TokenType",
+    "Token",
+    # Text / Whitespace
+    "Text",
+    "Whitespace",
+    "Newline",
+    # Error
+    "Error",
+    # Keywords
+    "Keyword",
+    "DDL",
+    "DML",
+    "CTE",
+    # Name
+    "Name",
+    # Literals
+    "Literal",
+    "String",
+    "Number",
+    # Operators
+    "Operator",
+    "Comparison",
+    # Other
+    "Punctuation",
+    "Wildcard",
+    "Comment",
+    "Assignment",
+    "Other",
+    "Generic",
+]

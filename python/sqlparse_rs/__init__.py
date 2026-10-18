@@ -41,3 +41,22 @@ from sqlparse_rs._patch import (  # noqa: F401
     is_patched,
     disabled,
 )
+
+__all__ = [
+    # Core functions
+    "tokenize",
+    "split",
+    "parse",
+    "format",
+    "parsestream",
+    # Compatibility layer
+    "patch",
+    "unpatch",
+    "is_patched",
+    "disabled",
+    # Sub-modules
+    "sql",
+    "tokens",
+    # Metadata
+    "__version__",
+]

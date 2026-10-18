@@ -22,6 +22,16 @@
 import contextlib
 import os
 
+__all__ = [
+    "is_patched",
+    "patch",
+    "unpatch",
+    "disabled",
+    # Backwards-compatible aliases
+    "install",
+    "uninstall",
+]
+
 _INSTALLED = False
 _ORIGINALS: dict = {}
 

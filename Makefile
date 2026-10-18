@@ -3,7 +3,7 @@ CORPUS  := corpus
 INPUTS  := $(CORPUS)/inputs.bin
 GOLDENS := $(CORPUS)/goldens.txt
 
-.PHONY: corpus goldens split-goldens check gen-keywords port-matrix build-py test-py bench-py clean
+.PHONY: corpus goldens split-goldens check gen-keywords port-matrix build-py test-py bench-py dist clean
 
 ## Rebuild inputs.bin from corpus/sql/*.sql (sorted, NUL-joined)
 corpus: $(INPUTS)
@@ -41,6 +41,10 @@ test-py: build-py
 
 bench-py: $(INPUTS)
 	$(PY) tools/oracle.py tokenize < $(INPUTS) > /dev/null
+
+## Build a release wheel for the current platform into dist/
+dist:
+	maturin build --release --out dist/
 
 clean:
 	rm -f $(INPUTS) $(GOLDENS)
