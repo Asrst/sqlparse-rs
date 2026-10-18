@@ -13,6 +13,12 @@ npm install -g opencode-ai
 curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --package-manager npm
 bob --version
 
+# Auto-approve all bob commands (no prompts for git, cargo, pytest, etc.)
+# Destructive ops (rm -rf, git push --force) are still blocked by the hook.
+if ! grep -q 'alias bob=' ~/.bashrc; then
+  echo 'alias bob="bob --auto-approve"' >> ~/.bashrc
+fi
+
 # Verify opencode
 opencode --version
 
