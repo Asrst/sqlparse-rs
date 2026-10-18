@@ -44,17 +44,17 @@ Pure Rust scanner (no PyO3 boundary): 1.35 MB corpus, 103,800 tokens: Python 0.7
 
 The end-to-end numbers are lower than the pure-Rust ones because `tokenize()` has to materialise 2.79 million Python tuples. `split()` returns 7,600 objects and shows the bigger win for exactly that reason. The next lever is a zero-copy iterator return (future work).
 
-### Adversarial scaling
+### Large and pathological inputs
 
-Unclosed dollar-quoted strings and comment-only input, 1 KB to 10 MB. Python runs in a subprocess with a 120 s timeout guard; identical bytes go to both engines.
+These tests measure what happens when the input is adversarial. Each run uses a subprocess with a 120 s timeout; identical bytes go to both engines.
 
-| Shape | Size | sqlparse 0.6.0 | sqlparse-rs |
-|-------|------|---------------|-------------|
-| Unclosed `$$` | 1 MB | 8.01 s | 1.86 s |
-| Unclosed `$$` | 10 MB | **DNF (> 120 s)** | 18.6 s |
-| Comment-only | 10 MB | 0.81 s | 0.27 s |
+| Input type | Size | sqlparse 0.6.0 | sqlparse-rs |
+|------------|------|---------------|-------------|
+| Dollar-quoted string, never closed | 1 MB | 8.01 s | 1.86 s |
+| Dollar-quoted string, never closed | 10 MB | **never finished (> 120 s)** | 18.6 s |
+| SQL comments only | 10 MB | 0.81 s | 0.27 s |
 
-The comment-only result is the control: both engines are linear and the gap is ~3x, matching the benign workloads. The DNF on unclosed dollar-quotes is where the Python regex engine hits its wall.
+The comment-only row is the fairness control: both engines are linear on that input and the gap stays around 3x, matching the benign batch workloads above. The 10 MB dollar-quote case is where the Python regex engine hits a wall; Rust finishes in linear time.
 
 Reproduce:
 
@@ -393,16 +393,20 @@ docs/DECISIONS.md                 architecture decisions log
 
 ## Implementation notes
 
-### Non-obvious sqlparse quirks covered by tests
+### Tokenizer behaviour worth knowing
 
-- Comments consume their trailing newline. `#` is only a comment when followed by a space; `--+` and `# +` are the MySQL hint variants.
-- Number rules: `1.5x` tokenizes as `Float "1."` + `Name "5x"`. `12abc` is `Integer "1"` + `Name "2abc"`.
-- Unclosed strings do not swallow to EOF. The opening quote becomes `Error` and the rest lexes normally.
-- Word continuation includes `$` and `#`: `a#>>b` is `Name "a#"` + operator `>>`.
-- Rule 13 fires before the word rule: `CASE`, `IN`, `VALUES`, `USING`, `FROM`, `AS` are always `Keyword`, never `Name`, regardless of context.
-- Rule 16 (lookbehind): `t.select` makes `select` a `Token.Name`, not a `Keyword`.
-- `split()` strips every statement. `CASE...END` does not protect semicolons; only `BEGIN...END` blocks do.
-- `BEGIN TRANSACTION` and `BEGIN WORK` must not open a block; only bare `BEGIN` does.
+- `CASE`, `IN`, `VALUES`, `USING`, `FROM`, `AS` are always `Token.Keyword` regardless of context. You cannot shadow them with a column or table name in the token stream.
+- A name immediately after a dot is always `Token.Name`. So `t.select` gives `Name "t"`, `Punctuation "."`, `Name "select"` — the reserved word is demoted by position.
+- `#` is only a line comment when followed by a space (`# comment`). A bare `#` inside a word is a word character, so `a#b` is a single `Name` token.
+- Number parsing can split unexpectedly: `1.5x` becomes `Float "1."` + `Name "5x"`, and `12abc` becomes `Integer "1"` + `Name "2abc"`.
+- Unclosed string literals do not consume the rest of the file. The opening quote becomes a single `Error` token and lexing continues normally.
+- Comments include their trailing newline in the token value.
+
+### Splitter behaviour worth knowing
+
+- `split()` always strips leading and trailing whitespace from each statement.
+- `CASE...END` does **not** protect semicolons. Only `BEGIN...END` blocks do. So `SELECT CASE WHEN a THEN 1; ELSE 2; END;` splits into four separate statements.
+- `BEGIN TRANSACTION` and `BEGIN WORK` do not open a block. Only a bare `BEGIN` on its own does.
 
 ### Limitations
 
