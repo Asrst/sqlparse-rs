@@ -17,8 +17,8 @@ maturin develop                                                # build debug .so
 maturin develop --release                                      # optimised build
 cargo test -p sqlparse-core                                    # run all Rust tests (unit + differential)
 cargo test -p sqlparse-core test_dollar_quoted -- --nocapture  # run a single Rust test by name filter
-pytest tests/ -v                                               # all Python tests
-pytest tests/test_compat.py::test_split_count -v               # single Python test
+uv run pytest tests/ -v                                        # all Python tests
+uv run pytest tests/test_compat.py::test_split_count -v        # single Python test
 make check                                                     # corpus + goldens must exist first; runs cargo test -p sqlparse-core
 make corpus goldens split-goldens                              # regenerate golden files (requires real sqlparse installed)
 make gen-keywords                                              # regenerate crates/sqlparse-core/src/keywords.rs from installed sqlparse
@@ -41,19 +41,26 @@ make gen-keywords                                              # regenerate crat
 
 ```
 pyproject.toml             — maturin config: module-name=sqlparse_rs, python-source=python
+uv.lock                    — locked Python dev dependencies
 python/sqlparse_rs/
-  __init__.py              — re-exports tokenize/split from .so; calls _patch.install()
-  _patch.py                — idempotent monkey-patch of sqlparse.lexer.Lexer.get_tokens
+  __init__.py              — re-exports full public API; patch/unpatch are explicit opt-in
+  _patch.py                — patch() / unpatch() / is_patched() / disabled()
+  _stream.py               — native parsestream() (no sqlparse dependency)
+  sql.py                   — AST node classes: Token, TokenList, Statement, Identifier, Where, …
+  tokens.py                — _TokenType hierarchy (drop-in for sqlparse.tokens)
+  py.typed                 — PEP 561 marker (package ships inline types)
 crates/sqlparse-core/src/
   ttype.rs      — &'static str token type constants (exact Python str(ttype) strings)
   keywords.rs   — GENERATED 803-entry keyword map + binary search; first-dict-wins priority
   lexer.rs      — 50-rule character scanner; zero-copy slices; O(n), no backtracking
   spans.rs      — find_delimited_spans prepass ($-quotes, /* */ hint detection)
   splitter.rs   — statement_splitter.py port; state machine with block stack
-  lib.rs        — pub use lexer::tokenize, splitter::split
-crates/sqlparse-py/src/lib.rs  — PyO3 glue; exposes tokenize()+split() as sqlparse_rs.sqlparse_rs
+  grouping.rs   — AST grouping (Rust port of sqlparse grouping.py)
+  formatter.rs  — SQL formatter (Rust port of sqlparse filters)
+  lib.rs        — public API: tokenize, split, parse, format
+crates/sqlparse-py/src/lib.rs  — PyO3 glue; exposes all four functions as sqlparse_rs.sqlparse_rs
 corpus/
-  sql/*.sql              — 24 fixture files (committed)
+  sql/*.sql              — 47 fixture files (committed)
   goldens.txt            — committed tokenize goldens (real sqlparse 0.6.0 output)
   goldens-split.txt      — committed split goldens
   inputs.bin             — NOT committed; regenerate with `make corpus`
@@ -63,6 +70,9 @@ tools/
   build_corpus.py        — builds corpus/inputs.bin
   dump_regex_table.py    — generates PORT_MATRIX.md
 tests/
-  test_wrapper.py        — Rust parity tests (sqlparse_rs vs real sqlparse, byte-identical)
-  test_compat.py         — Python API compat tests (45 tests: split/parse/format/tokenize/patch)
+  test_compat.py         — patch-mode compat tests (autouse fixture: patch()/unpatch())
+  test_native.py         — standalone tests, zero sqlparse dependency
+  test_independence.py   — subprocess-isolated independence contract (8 tests)
+  test_parity.py         — corpus + fuzz parity sweep
+  test_wrapper.py        — byte-identical parity vs real sqlparse (4 tests)
 ```

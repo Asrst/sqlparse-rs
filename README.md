@@ -1,5 +1,11 @@
 # sqlparse-rs
 
+[![CI](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Asrst/sqlparse-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/Asrst/sqlparse-rs)
+[![Python](https://img.shields.io/badge/python-3.9%20|%203.11%20|%203.12-blue)](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml)
+[![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
+[![Typed](https://img.shields.io/badge/typing-py.typed-informational)](python/sqlparse_rs/py.typed)
+
 A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0, exposed to Python via [PyO3](https://github.com/PyO3/pyo3). It is a **complete, standalone SQL engine** with the same public API as sqlparse — no runtime dependency on the Python library.
 
 `import sqlparse_rs` never touches sqlparse. The two packages install side by side, run independently, and you can compare them directly in the same interpreter. Redirecting sqlparse to the Rust engine is a deliberate opt-in: `sqlparse_rs.patch()` and `sqlparse_rs.unpatch()`.
@@ -310,7 +316,7 @@ sqlparse_rs.unpatch()  # original pure-Python engine restored exactly
 ## Development
 
 ```bash
-# Activate toolchain and venv (required in this devcontainer)
+# Activate toolchain (required in this devcontainer)
 source "$HOME/.cargo/env"
 source .venv/bin/activate
 
@@ -321,13 +327,13 @@ maturin develop
 maturin develop --release
 
 # All Python tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Single test
-pytest tests/test_compat.py::test_split_begin_end_not_split -v
+uv run pytest tests/test_compat.py::test_split_begin_end_not_split -v
 
 # Standalone tests (no sqlparse required)
-pytest tests/test_native.py -v
+uv run pytest tests/test_native.py -v
 
 # All Rust tests
 cargo test -p sqlparse-core
@@ -351,12 +357,14 @@ make check
 
 ```
 pyproject.toml                    maturin build config (mixed Rust/Python layout)
+uv.lock                           locked Python dev dependencies (uv)
 python/sqlparse_rs/
   __init__.py                     re-exports all public API; patch/unpatch explicit opt-in
   _patch.py                       patch() / unpatch() / is_patched() / disabled()
   _stream.py                      native parsestream()
   sql.py                          AST node classes (no sqlparse dependency)
   tokens.py                       token type hierarchy (no sqlparse dependency)
+  py.typed                        PEP 561 marker — package ships inline types
 crates/sqlparse-core/src/
   ttype.rs                        &'static str token type constants
   keywords.rs                     GENERATED 803-entry keyword map + binary search

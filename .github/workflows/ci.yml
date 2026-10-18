@@ -3,12 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
 
 env:
   CARGO_TERM_COLOR: always
-  # Keep incremental compilation artifacts between runs
   CARGO_INCREMENTAL: 1
 
 jobs:
@@ -55,13 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
+      # actions/setup-python puts the exact version on PATH so maturin-action
+      # picks it up correctly via --find-interpreter.
       - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -76,18 +75,32 @@ jobs:
           key: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-
 
-      - name: Create venv and install dependencies
-        run: |
-          uv venv --python ${{ matrix.python-version }} .venv
-          uv pip install --python .venv/bin/python maturin pytest sqlparse
+      - name: Install Python test dependencies
+        run: pip install pytest sqlparse pytest-cov
 
-      - name: Build and install (debug)
-        run: |
-          .venv/bin/maturin build --out dist/
-          uv pip install --python .venv/bin/python dist/*.whl
+      # maturin-action builds a wheel for the Python on PATH, outputs to dist/
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --manifest-path crates/sqlparse-py/Cargo.toml
+            --out dist
+            --find-interpreter
+
+      - name: Install wheel
+        run: pip install dist/*.whl --no-index --find-links dist/
 
       - name: Run Python tests
-        run: .venv/bin/pytest tests/ -v --tb=short
+        run: pytest tests/ -v --tb=short --cov=sqlparse_rs --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: python
+          fail_ci_if_error: false
 
   # ── Parity gate: byte-identical output vs real sqlparse ────────────────────
   parity:
@@ -96,13 +109,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
       - name: Set up Python 3.12
-        run: uv python install 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -117,18 +127,23 @@ jobs:
           key: ${{ runner.os }}-parity-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-parity-cargo-
 
-      - name: Create venv and install dependencies
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python maturin "sqlparse==0.6.0" pytest
+      - name: Install Python test dependencies
+        run: pip install "sqlparse==0.6.0" pytest
 
-      - name: Build and install
-        run: |
-          .venv/bin/maturin build --out dist/
-          uv pip install --python .venv/bin/python dist/*.whl
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --manifest-path crates/sqlparse-py/Cargo.toml
+            --out dist
+            --find-interpreter
+
+      - name: Install wheel
+        run: pip install dist/*.whl --no-index --find-links dist/
 
       - name: Run parity and wrapper tests
-        run: .venv/bin/pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
+        run: pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
 
       - name: Upload parity report
         if: always()
@@ -144,24 +159,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
       - name: Set up Python 3.12
-        run: uv python install 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Create venv and install maturin
-        run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python maturin
-
       - name: Build release wheel
-        run: .venv/bin/maturin build --release --out dist/
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --manifest-path crates/sqlparse-py/Cargo.toml
+            --release
+            --out dist
+            --find-interpreter
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4
@@ -169,3 +183,43 @@ jobs:
           name: wheel-linux-x86_64
           path: dist/*.whl
           retention-days: 7
+
+  # ── GitHub Release (tag-triggered, no PyPI needed) ─────────────────────────
+  # Fires only on `v*` tags (e.g. git tag v0.1.0b1 && git push --tags).
+  # Attaches the wheel to the release as a downloadable asset.
+  # Install without PyPI: pip install <release-asset-url>
+  release:
+    name: GitHub Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [rust, python, parity, build-wheel]
+    permissions:
+      contents: write  # needed to create/update the release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release wheel (manylinux)
+        uses: PyO3/maturin-action@v1
+        with:
+          command: build
+          args: >-
+            --manifest-path crates/sqlparse-py/Cargo.toml
+            --release
+            --out dist
+            --find-interpreter
+          manylinux: auto
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.whl
+          generate_release_notes: true
