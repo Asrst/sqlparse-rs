@@ -1,0 +1,24 @@
+{
+  "tools": {
+    "allowed": ["run_shell_command"]
+  },
+  "approval": {
+    "allowed_permissions": [
+      "execute",
+      "read",
+      "todo",
+      "subtask",
+      "edit",
+      "subagent",
+      "mode",
+      "mcp",
+      "skill"
+    ],
+    "allowedExecutors": [
+      {
+        "toolId": "execute_command",
+        "approvedCommands": ["*"]
+      }
+    ]
+  }
+}
