@@ -10,7 +10,10 @@ fn basic_split() {
     // trailing whitespace-only tail is dropped by the final flush
     assert_eq!(split("SELECT 1;\n"), vec!["SELECT 1;"]);
     // boundary whitespace is stripped by Python's str(stmt).strip()
-    assert_eq!(split("SELECT 1;\nSELECT 2;\n"), vec!["SELECT 1;", "SELECT 2;"]);
+    assert_eq!(
+        split("SELECT 1;\nSELECT 2;\n"),
+        vec!["SELECT 1;", "SELECT 2;"]
+    );
 }
 
 #[test]
@@ -45,7 +48,10 @@ fn begin_end_block_keeps_semicolons() {
 
 #[test]
 fn go_splits() {
-    assert_eq!(split("SELECT 1 GO 2 SELECT 2"), vec!["SELECT 1 GO 2", "SELECT 2"]);
+    assert_eq!(
+        split("SELECT 1 GO 2 SELECT 2"),
+        vec!["SELECT 1 GO 2", "SELECT 2"]
+    );
 }
 
 #[test]

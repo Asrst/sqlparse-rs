@@ -23,11 +23,11 @@ pub mod formatter;
 pub mod grouping;
 pub mod keywords;
 pub mod lexer;
-pub mod splitter;
 pub mod spans;
+pub mod splitter;
 pub mod ttype;
 
-pub use formatter::{format_sql, FormatOptions, CaseMode, OutputFormat};
-pub use grouping::{group, tokens_to_statement, get_type, Node, NodeKind};
+pub use formatter::{format_sql, CaseMode, FormatOptions, OutputFormat};
+pub use grouping::{get_type, group, tokens_to_statement, Node, NodeKind};
 pub use lexer::tokenize;
 pub use splitter::split;

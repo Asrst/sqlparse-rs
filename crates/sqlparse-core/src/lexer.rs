@@ -78,7 +78,11 @@ fn rule_at(ch: &[char], pos: usize) -> Match {
         return Some((ttype::NEWLINE, pos + 1));
     }
     if ch[pos] == '\r' {
-        let e = if pos + 1 < n && ch[pos + 1] == '\n' { pos + 2 } else { pos + 1 };
+        let e = if pos + 1 < n && ch[pos + 1] == '\n' {
+            pos + 2
+        } else {
+            pos + 1
+        };
         return Some((ttype::NEWLINE, e));
     }
     // 3: \s+? (LAZY -> exactly one whitespace char per token)
@@ -312,7 +316,11 @@ fn comment_line(ch: &[char], pos: usize, hint: bool) -> Option<usize> {
             let mut j = pos + plen;
             while j < n {
                 if ch[j] == '\r' {
-                    let e = if j + 1 < n && ch[j + 1] == '\n' { j + 2 } else { j + 1 };
+                    let e = if j + 1 < n && ch[j + 1] == '\n' {
+                        j + 2
+                    } else {
+                        j + 1
+                    };
                     return Some(e);
                 }
                 if ch[j] == '\n' {
@@ -344,16 +352,12 @@ fn scan_quoted(ch: &[char], pos: usize, quote: char, allow_escape: bool) -> Opti
     let mut stack: Vec<usize> = Vec::new();
     loop {
         if i >= n {
-            match stack.pop() {
-                Some(p) => {
-                    if ch[p] == quote {
-                        return Some(p + 1); // close at the former pair start
-                    }
-                    i = p + 1; // escape point: '\' re-consumed as ordinary char
-                    continue;
-                }
-                None => return None,
+            let p = stack.pop()?;
+            if ch[p] == quote {
+                return Some(p + 1); // close at the former pair start
             }
+            i = p + 1; // escape point: '\' re-consumed as ordinary char
+            continue;
         }
         let c = ch[i];
         if c == quote {
@@ -386,11 +390,7 @@ fn pct_placeholder(ch: &[char], pos: usize) -> Option<usize> {
         }
         // trailing s is case-insensitive (table compiles with IGNORECASE):
         // %SET must split as Placeholder "%S" + Name "ET" (fuzz regression)
-        if k > j + 1
-            && k < n
-            && ch[k] == ')'
-            && k + 1 < n
-            && (ch[k + 1] == 's' || ch[k + 1] == 'S')
+        if k > j + 1 && k < n && ch[k] == ')' && k + 1 < n && (ch[k + 1] == 's' || ch[k + 1] == 'S')
         {
             return Some(k + 2);
         }
@@ -900,7 +900,13 @@ fn r_lateral_view(ch: &[char], pos: usize) -> Option<usize> {
     if w2 == e2 {
         return None;
     }
-    for w in ["EXPLODE", "INLINE", "PARSE_URL_TUPLE", "POSEXPLODE", "STACK"] {
+    for w in [
+        "EXPLODE",
+        "INLINE",
+        "PARSE_URL_TUPLE",
+        "POSEXPLODE",
+        "STACK",
+    ] {
         if let Some(e3) = ci_word(ch, w2, w) {
             if boundary(ch, e3) {
                 return Some(e3);

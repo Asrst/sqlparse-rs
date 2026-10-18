@@ -188,7 +188,12 @@ impl Splitter {
             && (ttype == ttype::KEYWORD || ttype == ttype::NAME)
             && matches!(
                 unified.as_str(),
-                "TRANSACTION" | "WORK" | "TRAN" | "DISTRIBUTED" | "DEFERRED" | "IMMEDIATE"
+                "TRANSACTION"
+                    | "WORK"
+                    | "TRAN"
+                    | "DISTRIBUTED"
+                    | "DEFERRED"
+                    | "IMMEDIATE"
                     | "EXCLUSIVE"
             )
         {

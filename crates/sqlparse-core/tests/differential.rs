@@ -39,9 +39,8 @@ struct Golden {
 
 /// Parse goldens into per-record blocks; None = oracle-error record.
 fn parse_goldens(path: &Path) -> Vec<Option<Vec<Golden>>> {
-    let text = fs::read_to_string(path).unwrap_or_else(|e| {
-        panic!("cannot read {}: {e}", path.display())
-    });
+    let text =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let mut blocks: Vec<Option<Vec<Golden>>> = Vec::new();
     let mut cur: Option<Vec<Golden>> = None;
     for line in text.lines() {
@@ -70,7 +69,8 @@ fn parse_goldens(path: &Path) -> Vec<Option<Vec<Golden>>> {
 }
 
 fn parse_split_goldens(path: &Path) -> Vec<Option<Vec<String>>> {
-    let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
+    let text =
+        fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {}: {e}", path.display()));
     let mut blocks: Vec<Option<Vec<String>>> = Vec::new();
     let mut cur: Option<Vec<String>> = None;
     for line in text.lines() {
@@ -144,20 +144,23 @@ fn differential_tokenize_parity() {
         };
         compared += 1;
         let actual = sqlparse_core::tokenize(text);
-        let actual: Vec<(&str, String)> =
-            actual.into_iter().map(|(t, v)| (t, v.to_string())).collect();
+        let actual: Vec<(&str, String)> = actual
+            .into_iter()
+            .map(|(t, v)| (t, v.to_string()))
+            .collect();
 
         if actual.len() != expected.len() {
             mismatched += 1;
             if first.is_empty() {
                 let mut detail = String::new();
                 for k in 0..actual.len().min(expected.len()) {
-                    if expected[k].ttype != actual[k].0
-                        || expected[k].hex != hex_of(&actual[k].1)
-                    {
+                    if expected[k].ttype != actual[k].0 || expected[k].hex != hex_of(&actual[k].1) {
                         detail = format!(
                             "first differing token #{k}: expected {} {} | got {} {}\n",
-                            expected[k].ttype, expected[k].hex, actual[k].0, hex_of(&actual[k].1)
+                            expected[k].ttype,
+                            expected[k].hex,
+                            actual[k].0,
+                            hex_of(&actual[k].1)
                         );
                         break;
                     }
@@ -211,7 +214,11 @@ fn differential_split_parity() {
         return;
     }
     let blocks = parse_split_goldens(&gpath);
-    assert_eq!(inputs.len(), blocks.len(), "inputs/split-goldens out of sync");
+    assert_eq!(
+        inputs.len(),
+        blocks.len(),
+        "inputs/split-goldens out of sync"
+    );
 
     let mut compared = 0;
     let mut skipped = 0;

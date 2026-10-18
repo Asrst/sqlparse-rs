@@ -72,16 +72,25 @@ impl Node {
 
     pub fn group(kind: NodeKind, children: Vec<Node>) -> Self {
         let value: String = children.iter().map(|n| n.value.as_str()).collect();
-        Node { kind, ttype: None, value, children }
+        Node {
+            kind,
+            ttype: None,
+            value,
+            children,
+        }
     }
 
     // ── predicates ────────────────────────────────────────────────────────
 
     #[inline]
-    pub fn is_leaf(&self) -> bool { self.kind == NodeKind::Leaf }
+    pub fn is_leaf(&self) -> bool {
+        self.kind == NodeKind::Leaf
+    }
 
     #[inline]
-    pub fn is_group(&self) -> bool { self.kind != NodeKind::Leaf }
+    pub fn is_group(&self) -> bool {
+        self.kind != NodeKind::Leaf
+    }
 
     #[inline]
     pub fn is_whitespace(&self) -> bool {
@@ -160,7 +169,9 @@ impl Node {
     /// Returns the first non-whitespace, optionally non-comment child.
     pub fn token_first(&self, skip_cm: bool) -> Option<&Node> {
         self.children.iter().find(|n| {
-            if n.is_whitespace() { return false; }
+            if n.is_whitespace() {
+                return false;
+            }
             if skip_cm && (n.ttype_in("Token.Comment") || n.kind == NodeKind::Comment) {
                 return false;
             }
@@ -198,35 +209,35 @@ pub fn tokens_to_statement(tokens: Vec<(String, String)>) -> Node {
 /// to the closest parent (worst case: `"Token.Error"`).
 fn ttype_static(s: &str) -> &'static str {
     match s {
-        "Token.Comment.Single.Hint"       => ttype::COMMENT_SINGLE_HINT,
-        "Token.Comment.Single"            => ttype::COMMENT_SINGLE,
-        "Token.Comment.Multiline"         => ttype::COMMENT_MULTILINE,
-        "Token.Comment.Multiline.Hint"    => ttype::COMMENT_MULTILINE_HINT,
-        "Token.Text.Whitespace.Newline"   => ttype::NEWLINE,
-        "Token.Text.Whitespace"           => ttype::WHITESPACE,
-        "Token.Assignment"                => ttype::ASSIGNMENT,
-        "Token.Punctuation"               => ttype::PUNCTUATION,
-        "Token.Wildcard"                  => ttype::WILDCARD,
-        "Token.Name"                      => ttype::NAME,
-        "Token.Name.Placeholder"          => ttype::NAME_PLACEHOLDER,
-        "Token.Name.Builtin"              => ttype::NAME_BUILTIN,
-        "Token.Generic.Command"           => ttype::GENERIC_COMMAND,
-        "Token.Keyword"                   => ttype::KEYWORD,
-        "Token.Keyword.DML"               => ttype::KEYWORD_DML,
-        "Token.Keyword.DDL"               => ttype::KEYWORD_DDL,
-        "Token.Keyword.CTE"               => ttype::KEYWORD_CTE,
-        "Token.Keyword.Order"             => ttype::KEYWORD_ORDER,
-        "Token.Keyword.TZCast"            => ttype::KEYWORD_TZCAST,
-        "Token.Literal.Number.Hexadecimal"=> ttype::NUMBER_HEX,
-        "Token.Literal.Number.Float"      => ttype::NUMBER_FLOAT,
-        "Token.Literal.Number.Integer"    => ttype::NUMBER_INTEGER,
-        "Token.Literal.String.Single"     => ttype::STRING_SINGLE,
-        "Token.Literal.String.Symbol"     => ttype::STRING_SYMBOL,
-        "Token.Literal"                   => ttype::LITERAL,
-        "Token.Operator"                  => ttype::OPERATOR,
-        "Token.Operator.Comparison"       => ttype::OPERATOR_COMPARISON,
-        "Token.Error"                     => ttype::ERROR,
-        _                                 => ttype::ERROR,
+        "Token.Comment.Single.Hint" => ttype::COMMENT_SINGLE_HINT,
+        "Token.Comment.Single" => ttype::COMMENT_SINGLE,
+        "Token.Comment.Multiline" => ttype::COMMENT_MULTILINE,
+        "Token.Comment.Multiline.Hint" => ttype::COMMENT_MULTILINE_HINT,
+        "Token.Text.Whitespace.Newline" => ttype::NEWLINE,
+        "Token.Text.Whitespace" => ttype::WHITESPACE,
+        "Token.Assignment" => ttype::ASSIGNMENT,
+        "Token.Punctuation" => ttype::PUNCTUATION,
+        "Token.Wildcard" => ttype::WILDCARD,
+        "Token.Name" => ttype::NAME,
+        "Token.Name.Placeholder" => ttype::NAME_PLACEHOLDER,
+        "Token.Name.Builtin" => ttype::NAME_BUILTIN,
+        "Token.Generic.Command" => ttype::GENERIC_COMMAND,
+        "Token.Keyword" => ttype::KEYWORD,
+        "Token.Keyword.DML" => ttype::KEYWORD_DML,
+        "Token.Keyword.DDL" => ttype::KEYWORD_DDL,
+        "Token.Keyword.CTE" => ttype::KEYWORD_CTE,
+        "Token.Keyword.Order" => ttype::KEYWORD_ORDER,
+        "Token.Keyword.TZCast" => ttype::KEYWORD_TZCAST,
+        "Token.Literal.Number.Hexadecimal" => ttype::NUMBER_HEX,
+        "Token.Literal.Number.Float" => ttype::NUMBER_FLOAT,
+        "Token.Literal.Number.Integer" => ttype::NUMBER_INTEGER,
+        "Token.Literal.String.Single" => ttype::STRING_SINGLE,
+        "Token.Literal.String.Symbol" => ttype::STRING_SYMBOL,
+        "Token.Literal" => ttype::LITERAL,
+        "Token.Operator" => ttype::OPERATOR,
+        "Token.Operator.Comparison" => ttype::OPERATOR_COMPARISON,
+        "Token.Error" => ttype::ERROR,
+        _ => ttype::ERROR,
     }
 }
 
@@ -237,22 +248,25 @@ fn ttype_static(s: &str) -> &'static str {
 /// `token_next` — index of next non-ws token after `idx` (exclusive start).
 fn token_next(children: &[Node], idx: usize, skip_ws: bool) -> Option<usize> {
     let start = idx + 1;
-    for i in start..children.len() {
-        if skip_ws && children[i].is_whitespace() { continue; }
-        return Some(i);
-    }
-    None
+    children[start..]
+        .iter()
+        .position(|n| !(skip_ws && n.is_whitespace()))
+        .map(|rel| start + rel)
 }
 
 /// `token_prev` — index of prev non-ws token before `idx` (exclusive start).
 fn token_prev(children: &[Node], idx: usize, skip_ws: bool) -> Option<usize> {
-    if idx == 0 { return None; }
+    if idx == 0 {
+        return None;
+    }
     let mut i = idx - 1;
     loop {
         if !skip_ws || !children[i].is_whitespace() {
             return Some(i);
         }
-        if i == 0 { break; }
+        if i == 0 {
+            break;
+        }
         i -= 1;
     }
     None
@@ -263,15 +277,21 @@ fn token_next_by<F>(children: &[Node], start: usize, pred: F) -> Option<usize>
 where
     F: Fn(&Node) -> bool,
 {
-    for i in start..children.len() {
-        if pred(&children[i]) { return Some(i); }
-    }
-    None
+    children[start..]
+        .iter()
+        .position(pred)
+        .map(|rel| start + rel)
 }
 
 /// Replace children `[start..=end]` with a single group node of `kind`.
 /// Returns the new index (always `start`).
-fn group_tokens(children: &mut Vec<Node>, kind: NodeKind, start: usize, end: usize, extend: bool) -> usize {
+fn group_tokens(
+    children: &mut Vec<Node>,
+    kind: NodeKind,
+    start: usize,
+    end: usize,
+    extend: bool,
+) -> usize {
     let end_excl = end + 1;
     // Extend mode: if `children[start]` is already of the same kind, absorb.
     if extend && start < children.len() && children[start].kind == kind {
@@ -340,7 +360,12 @@ pub fn group(stmt: &mut Node) {
 
 // ── _group_matching ────────────────────────────────────────────────────────
 
-fn group_matching(node: &mut Node, kind: NodeKind, m_open: (&str, Option<&[&str]>), m_close: (&str, Option<&[&str]>)) {
+fn group_matching(
+    node: &mut Node,
+    kind: NodeKind,
+    m_open: (&str, Option<&[&str]>),
+    m_close: (&str, Option<&[&str]>),
+) {
     // Recurse into sub-groups of different kind first.
     for i in 0..node.children.len() {
         if node.children[i].is_group() && node.children[i].kind != kind {
@@ -354,22 +379,35 @@ fn group_matching(node: &mut Node, kind: NodeKind, m_open: (&str, Option<&[&str]
     let mut offset: isize = 0;
 
     // Snapshot the original length; we iterate over original indices.
-    let snap: Vec<bool> = node.children.iter().map(|c| {
-        !c.is_whitespace() && c.is_leaf()
-    }).collect();
+    let snap: Vec<bool> = node
+        .children
+        .iter()
+        .map(|c| !c.is_whitespace() && c.is_leaf())
+        .collect();
     let orig_len = snap.len();
 
     let mut orig_idx = 0usize;
     while orig_idx < orig_len {
-        if node.children.is_empty() { break; }
+        if node.children.is_empty() {
+            break;
+        }
         let cur_idx = (orig_idx as isize + offset) as usize;
-        if cur_idx >= node.children.len() { orig_idx += 1; continue; }
+        if cur_idx >= node.children.len() {
+            orig_idx += 1;
+            continue;
+        }
 
         let n = &node.children[cur_idx];
-        if n.is_whitespace() { orig_idx += 1; continue; }
-        if n.is_group() && n.kind != kind { orig_idx += 1; continue; }
+        if n.is_whitespace() {
+            orig_idx += 1;
+            continue;
+        }
+        if n.is_group() && n.kind != kind {
+            orig_idx += 1;
+            continue;
+        }
 
-        let is_open  = n.match_token(m_open.0,  m_open.1);
+        let is_open = n.match_token(m_open.0, m_open.1);
         let is_close = n.match_token(m_close.0, m_close.1);
 
         if is_open {
@@ -388,39 +426,57 @@ fn group_matching(node: &mut Node, kind: NodeKind, m_open: (&str, Option<&[&str]
 }
 
 fn group_brackets(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::SquareBrackets,
+    group_matching(
+        stmt,
+        NodeKind::SquareBrackets,
         (ttype::PUNCTUATION, Some(&["["])),
-        (ttype::PUNCTUATION, Some(&["]"])));
+        (ttype::PUNCTUATION, Some(&["]"])),
+    );
 }
 
 fn group_parenthesis(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::Parenthesis,
+    group_matching(
+        stmt,
+        NodeKind::Parenthesis,
         (ttype::PUNCTUATION, Some(&["("])),
-        (ttype::PUNCTUATION, Some(&[")"])));
+        (ttype::PUNCTUATION, Some(&[")"])),
+    );
 }
 
 fn group_case(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::Case,
+    group_matching(
+        stmt,
+        NodeKind::Case,
         (ttype::KEYWORD, Some(&["CASE"])),
-        (ttype::KEYWORD, Some(&["END"])));
+        (ttype::KEYWORD, Some(&["END"])),
+    );
 }
 
 fn group_if(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::If,
+    group_matching(
+        stmt,
+        NodeKind::If,
         (ttype::KEYWORD, Some(&["IF"])),
-        (ttype::KEYWORD, Some(&["END IF"])));
+        (ttype::KEYWORD, Some(&["END IF"])),
+    );
 }
 
 fn group_for(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::For,
+    group_matching(
+        stmt,
+        NodeKind::For,
         (ttype::KEYWORD, Some(&["FOR", "FOREACH"])),
-        (ttype::KEYWORD, Some(&["END LOOP"])));
+        (ttype::KEYWORD, Some(&["END LOOP"])),
+    );
 }
 
 fn group_begin(stmt: &mut Node) {
-    group_matching(stmt, NodeKind::Begin,
+    group_matching(
+        stmt,
+        NodeKind::Begin,
         (ttype::KEYWORD, Some(&["BEGIN"])),
-        (ttype::KEYWORD, Some(&["END"])));
+        (ttype::KEYWORD, Some(&["END"])),
+    );
 }
 
 // ── group_over ────────────────────────────────────────────────────────────
@@ -451,16 +507,26 @@ fn group_over_inner(node: &mut Node) {
     }
 }
 
-fn group_over(stmt: &mut Node) { group_over_inner(stmt); }
+fn group_over(stmt: &mut Node) {
+    group_over_inner(stmt);
+}
 
 // ── group_functions ───────────────────────────────────────────────────────
 
 fn group_functions_inner(node: &mut Node) {
     // Check CREATE TABLE WITHOUT AS sentinel.
-    let has_create = node.children.iter().any(|c| c.value.to_uppercase() == "CREATE");
-    let has_table  = node.children.iter().any(|c| c.value.to_uppercase() == "TABLE");
-    let has_as     = node.children.iter().any(|c| c.value.to_uppercase() == "AS");
-    if has_create && has_table && !has_as { return; }
+    let has_create = node
+        .children
+        .iter()
+        .any(|c| c.value.to_uppercase() == "CREATE");
+    let has_table = node
+        .children
+        .iter()
+        .any(|c| c.value.to_uppercase() == "TABLE");
+    let has_as = node.children.iter().any(|c| c.value.to_uppercase() == "AS");
+    if has_create && has_table && !has_as {
+        return;
+    }
 
     // Recurse into non-Function sublists.
     for i in 0..node.children.len() {
@@ -478,8 +544,14 @@ fn group_functions_inner(node: &mut Node) {
                 if node.children[nidx].kind == NodeKind::Parenthesis {
                     // Check for trailing Over.
                     let eidx = if let Some(oidx) = token_next(&node.children, nidx, true) {
-                        if node.children[oidx].kind == NodeKind::Over { oidx } else { nidx }
-                    } else { nidx };
+                        if node.children[oidx].kind == NodeKind::Over {
+                            oidx
+                        } else {
+                            nidx
+                        }
+                    } else {
+                        nidx
+                    };
                     group_tokens(&mut node.children, NodeKind::Function, i, eidx, false);
                     node.sync_value();
                     continue;
@@ -490,7 +562,9 @@ fn group_functions_inner(node: &mut Node) {
     }
 }
 
-fn group_functions(stmt: &mut Node) { group_functions_inner(stmt); }
+fn group_functions(stmt: &mut Node) {
+    group_functions_inner(stmt);
+}
 
 // ── group_where ───────────────────────────────────────────────────────────
 
@@ -504,8 +578,16 @@ fn group_where_inner(node: &mut Node) {
         }
     }
     let where_close: &[&str] = &[
-        "ORDER BY", "GROUP BY", "LIMIT", "UNION", "UNION ALL",
-        "EXCEPT", "INTERSECT", "HAVING", "RETURNING", "INTO",
+        "ORDER BY",
+        "GROUP BY",
+        "LIMIT",
+        "UNION",
+        "UNION ALL",
+        "EXCEPT",
+        "INTERSECT",
+        "HAVING",
+        "RETURNING",
+        "INTO",
     ];
     let mut i = 0usize;
     while i < node.children.len() {
@@ -526,23 +608,26 @@ fn group_where_inner(node: &mut Node) {
     }
 }
 
-fn group_where(stmt: &mut Node) { group_where_inner(stmt); }
+fn group_where(stmt: &mut Node) {
+    group_where_inner(stmt);
+}
 
 // ── _group helper (dyn Fn to avoid monomorphization recursion) ────────────
 
-type MatchFn<'a>  = &'a dyn Fn(&Node) -> bool;
-type ValidFn<'a>  = &'a dyn Fn(Option<&Node>) -> bool;
-type PostFn<'a>   = &'a dyn Fn(&[Node], usize, usize, Option<usize>) -> (usize, Option<usize>);
+type MatchFn<'a> = &'a dyn Fn(&Node) -> bool;
+type ValidFn<'a> = &'a dyn Fn(Option<&Node>) -> bool;
+type PostFn<'a> = &'a dyn Fn(&[Node], usize, usize, Option<usize>) -> (usize, Option<usize>);
 
 /// Generic middle-token grouper.  Mirrors Python `_group()`.
 /// Uses trait objects so the recursive call does not monomorphize infinitely.
+#[allow(clippy::too_many_arguments)]
 fn _group(
     node: &mut Node,
     kind: NodeKind,
-    match_fn:   MatchFn<'_>,
+    match_fn: MatchFn<'_>,
     valid_prev: ValidFn<'_>,
     valid_next: ValidFn<'_>,
-    post_fn:    PostFn<'_>,
+    post_fn: PostFn<'_>,
     extend: bool,
     do_recurse: bool,
 ) {
@@ -550,8 +635,18 @@ fn _group(
     if do_recurse {
         for i in 0..node.children.len() {
             if node.children[i].is_group() && node.children[i].kind != kind {
-                let mut child = std::mem::replace(&mut node.children[i], Node::leaf(ttype::ERROR, ""));
-                _group(&mut child, kind.clone(), match_fn, valid_prev, valid_next, post_fn, extend, do_recurse);
+                let mut child =
+                    std::mem::replace(&mut node.children[i], Node::leaf(ttype::ERROR, ""));
+                _group(
+                    &mut child,
+                    kind.clone(),
+                    match_fn,
+                    valid_prev,
+                    valid_next,
+                    post_fn,
+                    extend,
+                    do_recurse,
+                );
                 node.children[i] = child;
             }
         }
@@ -561,7 +656,10 @@ fn _group(
     let mut i = 0usize;
     while i < node.children.len() {
         let n = &node.children[i];
-        if n.is_whitespace() { i += 1; continue; }
+        if n.is_whitespace() {
+            i += 1;
+            continue;
+        }
 
         if match_fn(n) {
             let nidx = token_next(&node.children, i, true);
@@ -569,7 +667,10 @@ fn _group(
             let next_ok = valid_next(nidx.map(|ni| &node.children[ni]));
             if prev_ok && next_ok {
                 let (from, to) = post_fn(&node.children, pidx.unwrap(), i, nidx);
-                let to_idx = match to { Some(t) => t, None => i };
+                let to_idx = match to {
+                    Some(t) => t,
+                    None => i,
+                };
                 group_tokens(&mut node.children, kind.clone(), from, to_idx, extend);
                 node.sync_value();
                 pidx = Some(from);
@@ -592,7 +693,8 @@ fn group_typecasts(stmt: &mut Node) {
         &|n| n.is_some(),
         &|n| n.is_some(),
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -606,12 +708,15 @@ fn group_tzcasts(stmt: &mut Node) {
         &|n| n.is_some(),
         &|n| match n {
             None => false,
-            Some(n) => n.is_whitespace()
-                || n.match_token(ttype::KEYWORD, Some(&["AS"]))
-                || n.match_token(ttype::PUNCTUATION, Some(&["'"])),
+            Some(n) => {
+                n.is_whitespace()
+                    || n.match_token(ttype::KEYWORD, Some(&["AS"]))
+                    || n.match_token(ttype::PUNCTUATION, Some(&["'"]))
+            }
         },
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -622,12 +727,15 @@ fn group_typed_literal(stmt: &mut Node) {
     _group(
         stmt,
         NodeKind::TypedLiteral,
-        &|n| n.ttype == Some(ttype::NAME_BUILTIN)
-            || n.match_token(ttype::KEYWORD, Some(&["TIMESTAMP"])),
+        &|n| {
+            n.ttype == Some(ttype::NAME_BUILTIN)
+                || n.match_token(ttype::KEYWORD, Some(&["TIMESTAMP"]))
+        },
         &|n| n.is_some(),
         &|n| matches!(n, Some(n) if n.ttype == Some(ttype::STRING_SINGLE)),
         &|_, _pidx, tidx, nidx| (tidx, nidx),
-        false, true,
+        false,
+        true,
     );
     // Second pass: extend with DAY/HOUR/etc.
     let extend_kws: &[&str] = &["DAY", "HOUR", "MINUTE", "MONTH", "SECOND", "YEAR"];
@@ -638,7 +746,8 @@ fn group_typed_literal(stmt: &mut Node) {
         &|n| n.is_some(),
         &|n| matches!(n, Some(n) if n.match_token(ttype::KEYWORD, Some(extend_kws))),
         &|_, _pidx, tidx, nidx| (tidx, nidx),
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -647,36 +756,53 @@ fn group_typed_literal(stmt: &mut Node) {
 fn group_period(stmt: &mut Node) {
     let id_kinds = &[NodeKind::SquareBrackets, NodeKind::Identifier];
     let prev_ttypes = &[ttype::NAME, ttype::STRING_SYMBOL];
-    let next_kinds  = &[NodeKind::SquareBrackets, NodeKind::Function];
-    let next_ttypes = &[ttype::NAME, ttype::STRING_SYMBOL, ttype::WILDCARD, ttype::STRING_SINGLE];
+    let next_kinds = &[NodeKind::SquareBrackets, NodeKind::Function];
+    let next_ttypes = &[
+        ttype::NAME,
+        ttype::STRING_SYMBOL,
+        ttype::WILDCARD,
+        ttype::STRING_SINGLE,
+    ];
 
     _group(
         stmt,
         NodeKind::Identifier,
-        &|n| n.match_token(ttype::PUNCTUATION, Some(&["."]))
-            || n.match_token(ttype::OPERATOR, Some(&["->", "->>"])),
+        &|n| {
+            n.match_token(ttype::PUNCTUATION, Some(&["."]))
+                || n.match_token(ttype::OPERATOR, Some(&["->", "->>"]))
+        },
         &|n| match n {
             None => false,
             Some(n) => imt_kind(n, id_kinds) || imt_ttype(n, prev_ttypes),
         },
-        &|_| true,  // validated in post
+        &|_| true, // validated in post
         &|children, pidx, tidx, nidx| {
             // Post: validate next token.
             let next_ok = match nidx {
                 None => false,
-                Some(ni) => imt_kind(&children[ni], next_kinds)
-                    || imt_ttype(&children[ni], next_ttypes),
+                Some(ni) => {
+                    imt_kind(&children[ni], next_kinds) || imt_ttype(&children[ni], next_ttypes)
+                }
             };
-            if next_ok { (pidx, nidx) } else { (pidx, Some(tidx)) }
+            if next_ok {
+                (pidx, nidx)
+            } else {
+                (pidx, Some(tidx))
+            }
         },
-        true, true,
+        true,
+        true,
     );
 }
 
 // ── group_arrays ──────────────────────────────────────────────────────────
 
 fn group_arrays(stmt: &mut Node) {
-    let id_kinds  = &[NodeKind::SquareBrackets, NodeKind::Identifier, NodeKind::Function];
+    let id_kinds = &[
+        NodeKind::SquareBrackets,
+        NodeKind::Identifier,
+        NodeKind::Function,
+    ];
     let id_ttypes = &[ttype::NAME, ttype::STRING_SYMBOL];
     _group(
         stmt,
@@ -688,7 +814,8 @@ fn group_arrays(stmt: &mut Node) {
         },
         &|_| true,
         &|_, pidx, tidx, _nidx| (pidx, Some(tidx)),
-        true, false, // extend=true, recurse=false
+        true,
+        false, // extend=true, recurse=false
     );
 }
 
@@ -715,7 +842,9 @@ fn group_identifier_inner(node: &mut Node) {
     }
 }
 
-fn group_identifier(stmt: &mut Node) { group_identifier_inner(stmt); }
+fn group_identifier(stmt: &mut Node) {
+    group_identifier_inner(stmt);
+}
 
 // ── group_order ───────────────────────────────────────────────────────────
 
@@ -746,24 +875,43 @@ fn group_order_inner(node: &mut Node) {
     }
 }
 
-fn group_order(stmt: &mut Node) { group_order_inner(stmt); }
+fn group_order(stmt: &mut Node) {
+    group_order_inner(stmt);
+}
 
 // ── group_operator ────────────────────────────────────────────────────────
 
 fn group_operator(stmt: &mut Node) {
-    let op_kinds   = &[NodeKind::SquareBrackets, NodeKind::Parenthesis, NodeKind::Function,
-                       NodeKind::Identifier, NodeKind::Operation, NodeKind::TypedLiteral];
-    let num_ttypes = &[ttype::NUMBER_INTEGER, ttype::NUMBER_FLOAT, ttype::NUMBER_HEX,
-                       ttype::STRING_SINGLE, ttype::STRING_SYMBOL,
-                       ttype::NAME, ttype::NAME_PLACEHOLDER];
+    let op_kinds = &[
+        NodeKind::SquareBrackets,
+        NodeKind::Parenthesis,
+        NodeKind::Function,
+        NodeKind::Identifier,
+        NodeKind::Operation,
+        NodeKind::TypedLiteral,
+    ];
+    let num_ttypes = &[
+        ttype::NUMBER_INTEGER,
+        ttype::NUMBER_FLOAT,
+        ttype::NUMBER_HEX,
+        ttype::STRING_SINGLE,
+        ttype::STRING_SYMBOL,
+        ttype::NAME,
+        ttype::NAME_PLACEHOLDER,
+    ];
 
     let valid = move |n: Option<&Node>| -> bool {
         match n {
             None => false,
             Some(n) => {
-                if imt_kind(n, op_kinds) || imt_ttype(n, num_ttypes) { return true; }
+                if imt_kind(n, op_kinds) || imt_ttype(n, num_ttypes) {
+                    return true;
+                }
                 // CURRENT_DATE/TIME/TIMESTAMP keyword special case.
-                n.match_token(ttype::KEYWORD, Some(&["CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP"]))
+                n.match_token(
+                    ttype::KEYWORD,
+                    Some(&["CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP"]),
+                )
             }
         }
     };
@@ -775,24 +923,38 @@ fn group_operator(stmt: &mut Node) {
         &valid,
         &valid,
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        false, true,
+        false,
+        true,
     );
 }
 
 // ── group_comparison ─────────────────────────────────────────────────────
 
 fn group_comparison(stmt: &mut Node) {
-    let comp_kinds  = &[NodeKind::Parenthesis, NodeKind::Function, NodeKind::Identifier,
-                        NodeKind::Operation, NodeKind::TypedLiteral];
-    let num_ttypes  = &[ttype::NUMBER_INTEGER, ttype::NUMBER_FLOAT, ttype::NUMBER_HEX,
-                        ttype::STRING_SINGLE, ttype::STRING_SYMBOL,
-                        ttype::NAME, ttype::NAME_PLACEHOLDER];
+    let comp_kinds = &[
+        NodeKind::Parenthesis,
+        NodeKind::Function,
+        NodeKind::Identifier,
+        NodeKind::Operation,
+        NodeKind::TypedLiteral,
+    ];
+    let num_ttypes = &[
+        ttype::NUMBER_INTEGER,
+        ttype::NUMBER_FLOAT,
+        ttype::NUMBER_HEX,
+        ttype::STRING_SINGLE,
+        ttype::STRING_SYMBOL,
+        ttype::NAME,
+        ttype::NAME_PLACEHOLDER,
+    ];
 
     let valid = move |n: Option<&Node>| -> bool {
         match n {
             None => false,
             Some(n) => {
-                if imt_kind(n, comp_kinds) || imt_ttype(n, num_ttypes) { return true; }
+                if imt_kind(n, comp_kinds) || imt_ttype(n, num_ttypes) {
+                    return true;
+                }
                 n.is_keyword() && n.normalized() == "NULL"
             }
         }
@@ -805,7 +967,8 @@ fn group_comparison(stmt: &mut Node) {
         &valid,
         &valid,
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        false, true,
+        false,
+        true,
     );
 }
 
@@ -822,12 +985,15 @@ fn group_as(stmt: &mut Node) {
         },
         &|n| match n {
             None => false,
-            Some(n) => !n.ttype_in(ttype::KEYWORD_DML)
-                && !n.ttype_in(ttype::KEYWORD_DDL)
-                && !n.ttype_in(ttype::KEYWORD_CTE),
+            Some(n) => {
+                !n.ttype_in(ttype::KEYWORD_DML)
+                    && !n.ttype_in(ttype::KEYWORD_DDL)
+                    && !n.ttype_in(ttype::KEYWORD_CTE)
+            }
         },
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -841,14 +1007,24 @@ fn group_aliased_inner(node: &mut Node) {
             node.children[i] = child;
         }
     }
-    let alias_kinds = &[NodeKind::Parenthesis, NodeKind::Function, NodeKind::Case,
-                        NodeKind::Identifier, NodeKind::Operation, NodeKind::Comparison];
-    let num_ttypes  = &[ttype::NUMBER_INTEGER, ttype::NUMBER_FLOAT, ttype::NUMBER_HEX];
+    let alias_kinds = &[
+        NodeKind::Parenthesis,
+        NodeKind::Function,
+        NodeKind::Case,
+        NodeKind::Identifier,
+        NodeKind::Operation,
+        NodeKind::Comparison,
+    ];
+    let num_ttypes = &[
+        ttype::NUMBER_INTEGER,
+        ttype::NUMBER_FLOAT,
+        ttype::NUMBER_HEX,
+    ];
 
     let mut i = 0usize;
     while i < node.children.len() {
-        let is_alias_target = imt_kind(&node.children[i], alias_kinds)
-            || imt_ttype(&node.children[i], num_ttypes);
+        let is_alias_target =
+            imt_kind(&node.children[i], alias_kinds) || imt_ttype(&node.children[i], num_ttypes);
         if is_alias_target {
             if let Some(nidx) = token_next(&node.children, i, true) {
                 if node.children[nidx].kind == NodeKind::Identifier {
@@ -862,7 +1038,9 @@ fn group_aliased_inner(node: &mut Node) {
     }
 }
 
-fn group_aliased(stmt: &mut Node) { group_aliased_inner(stmt); }
+fn group_aliased(stmt: &mut Node) {
+    group_aliased_inner(stmt);
+}
 
 // ── group_assignment ──────────────────────────────────────────────────────
 
@@ -880,7 +1058,8 @@ fn group_assignment(stmt: &mut Node) {
             });
             (pidx, semi_idx.or(nidx))
         },
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -921,7 +1100,13 @@ fn group_comments_inner(node: &mut Node) {
                     real_end -= 1;
                 }
                 if real_end >= start {
-                    group_tokens(&mut node.children, NodeKind::Comment, start, real_end, false);
+                    group_tokens(
+                        &mut node.children,
+                        NodeKind::Comment,
+                        start,
+                        real_end,
+                        false,
+                    );
                     node.sync_value();
                     continue;
                 }
@@ -931,24 +1116,44 @@ fn group_comments_inner(node: &mut Node) {
     }
 }
 
-fn group_comments(stmt: &mut Node) { group_comments_inner(stmt); }
+fn group_comments(stmt: &mut Node) {
+    group_comments_inner(stmt);
+}
 
 // ── group_identifier_list ─────────────────────────────────────────────────
 
 fn group_identifier_list(stmt: &mut Node) {
-    let list_kinds  = &[NodeKind::Function, NodeKind::Case, NodeKind::Identifier,
-                        NodeKind::Comparison, NodeKind::IdentifierList, NodeKind::Operation];
-    let list_ttypes = &[ttype::NUMBER_INTEGER, ttype::NUMBER_FLOAT, ttype::NUMBER_HEX,
-                        ttype::STRING_SINGLE, ttype::STRING_SYMBOL,
-                        ttype::NAME, ttype::NAME_PLACEHOLDER,
-                        ttype::KEYWORD, "Token.Comment", ttype::WILDCARD];
+    let list_kinds = &[
+        NodeKind::Function,
+        NodeKind::Case,
+        NodeKind::Identifier,
+        NodeKind::Comparison,
+        NodeKind::IdentifierList,
+        NodeKind::Operation,
+    ];
+    let list_ttypes = &[
+        ttype::NUMBER_INTEGER,
+        ttype::NUMBER_FLOAT,
+        ttype::NUMBER_HEX,
+        ttype::STRING_SINGLE,
+        ttype::STRING_SYMBOL,
+        ttype::NAME,
+        ttype::NAME_PLACEHOLDER,
+        ttype::KEYWORD,
+        "Token.Comment",
+        ttype::WILDCARD,
+    ];
 
     let valid = move |n: Option<&Node>| -> bool {
         match n {
             None => false,
             Some(n) => {
-                if imt_kind(n, list_kinds) { return true; }
-                if imt_ttype(n, list_ttypes) { return true; }
+                if imt_kind(n, list_kinds) {
+                    return true;
+                }
+                if imt_ttype(n, list_ttypes) {
+                    return true;
+                }
                 // role / null keywords
                 n.match_token(ttype::KEYWORD, Some(&["NULL", "ROLE"]))
             }
@@ -962,7 +1167,8 @@ fn group_identifier_list(stmt: &mut Node) {
         &valid,
         &valid,
         &|_, pidx, _tidx, nidx| (pidx, nidx),
-        true, true,
+        true,
+        true,
     );
 }
 
@@ -992,7 +1198,9 @@ fn align_comments_inner(node: &mut Node) {
     }
 }
 
-fn align_comments(stmt: &mut Node) { align_comments_inner(stmt); }
+fn align_comments(stmt: &mut Node) {
+    align_comments_inner(stmt);
+}
 
 // ── group_values ──────────────────────────────────────────────────────────
 
@@ -1023,22 +1231,19 @@ pub fn get_type(stmt: &Node) -> &'static str {
     let first = stmt.token_first(true);
     match first {
         None => "UNKNOWN",
-        Some(t) => {
-            if t.ttype_in(ttype::KEYWORD_DML) || t.ttype_in(ttype::KEYWORD_DDL) {
-                // Return a static str for common types.
-                match t.normalized().as_str() {
-                    "SELECT" => "SELECT",
-                    "INSERT" => "INSERT",
-                    "UPDATE" => "UPDATE",
-                    "DELETE" => "DELETE",
-                    "CREATE" => "CREATE",
-                    "ALTER"  => "ALTER",
-                    "DROP"   => "DROP",
-                    _        => "UNKNOWN",
-                }
-            } else {
-                "UNKNOWN"
+        Some(t) if t.ttype_in(ttype::KEYWORD_DML) || t.ttype_in(ttype::KEYWORD_DDL) => {
+            // Return a static str for common types.
+            match t.normalized().as_str() {
+                "SELECT" => "SELECT",
+                "INSERT" => "INSERT",
+                "UPDATE" => "UPDATE",
+                "DELETE" => "DELETE",
+                "CREATE" => "CREATE",
+                "ALTER" => "ALTER",
+                "DROP" => "DROP",
+                _ => "UNKNOWN",
             }
         }
+        Some(_) => "UNKNOWN",
     }
 }

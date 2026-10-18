@@ -135,7 +135,12 @@ fn operator_order_quirks() {
     assert_eq!(pairs("a+-b")[1], ("Token.Operator", "+-".into()));
     assert_eq!(
         types("a-+b"),
-        vec!["Token.Name", "Token.Operator", "Token.Operator", "Token.Name"]
+        vec![
+            "Token.Name",
+            "Token.Operator",
+            "Token.Operator",
+            "Token.Name"
+        ]
     );
     assert_eq!(pairs("a->>b")[1], ("Token.Operator", "->>".into()));
     assert_eq!(
@@ -168,14 +173,23 @@ fn multiword_keywords_and_orders() {
             ("Token.Keyword", "WHEN".into())
         ]
     );
-    assert_eq!(pairs("LEFT JOIN t")[0], ("Token.Keyword", "LEFT JOIN".into()));
+    assert_eq!(
+        pairs("LEFT JOIN t")[0],
+        ("Token.Keyword", "LEFT JOIN".into())
+    );
     assert_eq!(pairs("END IF")[0], ("Token.Keyword", "END IF".into()));
     assert_eq!(pairs("ORDER BY x")[0], ("Token.Keyword", "ORDER BY".into()));
     assert_eq!(types("ASC"), vec!["Token.Keyword.Order"]);
-    assert_eq!(pairs("DESC NULLS LAST")[0], ("Token.Keyword.Order", "DESC NULLS LAST".into()));
+    assert_eq!(
+        pairs("DESC NULLS LAST")[0],
+        ("Token.Keyword.Order", "DESC NULLS LAST".into())
+    );
     assert_eq!(types("GO 2"), vec!["Token.Keyword"]);
     assert_eq!(types("GO"), vec!["Token.Keyword"]);
-    assert_eq!(pairs("AT TIME ZONE 'UTC'")[0], ("Token.Keyword.TZCast", "AT TIME ZONE 'UTC'".into()));
+    assert_eq!(
+        pairs("AT TIME ZONE 'UTC'")[0],
+        ("Token.Keyword.TZCast", "AT TIME ZONE 'UTC'".into())
+    );
     assert_eq!(types("NOT LIKE"), vec!["Token.Operator.Comparison"]);
     assert_eq!(types("IF NOT EXISTS"), vec!["Token.Keyword"]);
     assert_eq!(types("\\dt"), vec!["Token.Generic.Command"]);
@@ -188,7 +202,11 @@ fn multiword_keywords_and_orders() {
     assert_eq!(types("UNION ALL"), vec!["Token.Keyword"]);
     assert_eq!(
         types("NATIONAL CHAR"),
-        vec!["Token.Keyword", "Token.Text.Whitespace", "Token.Name.Builtin"]
+        vec![
+            "Token.Keyword",
+            "Token.Text.Whitespace",
+            "Token.Name.Builtin"
+        ]
     );
 }
 
@@ -253,7 +271,10 @@ fn brackets_whitespace_error() {
             ("Token.Name", "col".into()),
         ]
     );
-    assert_eq!(types("a.b"), vec!["Token.Name", "Token.Punctuation", "Token.Name"]);
+    assert_eq!(
+        types("a.b"),
+        vec!["Token.Name", "Token.Punctuation", "Token.Name"]
+    );
     // \s+? is lazy: ONE whitespace char per token
     assert_eq!(
         types("a  b")

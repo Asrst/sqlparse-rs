@@ -14,7 +14,7 @@
 //! - `SpacesAroundOperatorsFilter` — use_space_around_operators
 //! - `StripTrailingSemicolonFilter` — used by split(strip_semicolon=True)
 //! - `ReindentFilter`        — reindent with indent_width/char/wrap_after/
-//!                             comma_first/indent_after_first/indent_columns/compact
+//!   comma_first/indent_after_first/indent_columns/compact
 //! - `OutputPythonFilter`    — output_format='python'
 //! - `OutputPHPFilter`       — output_format='php'
 //! - `SerializerUnicode`     — trailing-whitespace trim per line
@@ -31,36 +31,44 @@ use crate::ttype;
 
 #[derive(Debug, Clone, Default)]
 pub struct FormatOptions {
-    pub keyword_case:              Option<CaseMode>,
-    pub identifier_case:           Option<CaseMode>,
-    pub strip_comments:            bool,
-    pub strip_whitespace:          bool,
-    pub reindent:                  bool,
-    pub reindent_aligned:          bool,
-    pub indent_width:              usize,   // default 2
-    pub indent_tabs:               bool,
-    pub indent_after_first:        bool,
-    pub indent_columns:            bool,
-    pub wrap_after:                usize,   // 0 = no wrap
-    pub comma_first:               bool,
-    pub compact:                   bool,
-    pub use_space_around_operators:bool,
-    pub truncate_strings:          Option<usize>,
-    pub truncate_char:             String,  // default "[...]"
-    pub output_format:             Option<OutputFormat>,
-    pub right_margin:              Option<usize>,
+    pub keyword_case: Option<CaseMode>,
+    pub identifier_case: Option<CaseMode>,
+    pub strip_comments: bool,
+    pub strip_whitespace: bool,
+    pub reindent: bool,
+    pub reindent_aligned: bool,
+    pub indent_width: usize, // default 2
+    pub indent_tabs: bool,
+    pub indent_after_first: bool,
+    pub indent_columns: bool,
+    pub wrap_after: usize, // 0 = no wrap
+    pub comma_first: bool,
+    pub compact: bool,
+    pub use_space_around_operators: bool,
+    pub truncate_strings: Option<usize>,
+    pub truncate_char: String, // default "[...]"
+    pub output_format: Option<OutputFormat>,
+    pub right_margin: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CaseMode { Upper, Lower, Capitalize }
+pub enum CaseMode {
+    Upper,
+    Lower,
+    Capitalize,
+}
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum OutputFormat { Sql, Python, Php }
+pub enum OutputFormat {
+    Sql,
+    Python,
+    Php,
+}
 
 impl FormatOptions {
     pub fn new() -> Self {
         FormatOptions {
-            indent_width:  2,
+            indent_width: 2,
             truncate_char: "[...]".to_owned(),
             ..Default::default()
         }
@@ -68,7 +76,11 @@ impl FormatOptions {
 
     /// Returns the indent character (space or tab).
     pub fn indent_char(&self) -> char {
-        if self.indent_tabs { '\t' } else { ' ' }
+        if self.indent_tabs {
+            '\t'
+        } else {
+            ' '
+        }
     }
 }
 
@@ -174,7 +186,11 @@ fn format_tokens(
     }
     if opts.reindent {
         let prefix: String = if k > 0 {
-            if *prev_ends_nl { "\n".to_owned() } else { "\n\n".to_owned() }
+            if *prev_ends_nl {
+                "\n".to_owned()
+            } else {
+                "\n\n".to_owned()
+            }
         } else {
             String::new()
         };
@@ -196,12 +212,12 @@ fn format_tokens(
 
 fn apply_case(val: &str, mode: &CaseMode) -> String {
     match mode {
-        CaseMode::Upper      => val.to_uppercase(),
-        CaseMode::Lower      => val.to_lowercase(),
+        CaseMode::Upper => val.to_uppercase(),
+        CaseMode::Lower => val.to_lowercase(),
         CaseMode::Capitalize => {
             let mut chars = val.chars();
             match chars.next() {
-                None    => String::new(),
+                None => String::new(),
                 Some(c) => c.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase(),
             }
         }
@@ -210,9 +226,9 @@ fn apply_case(val: &str, mode: &CaseMode) -> String {
 
 fn truncate_string(val: &str, width: usize, trunc_char: &str) -> String {
     let (inner, quote) = if val.starts_with("''") {
-        (&val[2..val.len()-2], "''")
+        (&val[2..val.len() - 2], "''")
     } else {
-        (&val[1..val.len()-1], "'")
+        (&val[1..val.len() - 1], "'")
     };
     if inner.len() > width {
         format!("{}{}{}{}", quote, &inner[..width], trunc_char, quote)
@@ -240,15 +256,25 @@ fn strip_comments(node: &mut Node) {
     let mut i = 0;
     while i < node.children.len() {
         let is_comment = is_comment_node(&node.children[i]);
-        if !is_comment { i += 1; continue; }
+        if !is_comment {
+            i += 1;
+            continue;
+        }
         // Skip SQL hints.
-        if is_hint_node(&node.children[i]) { i += 1; continue; }
+        if is_hint_node(&node.children[i]) {
+            i += 1;
+            continue;
+        }
 
         // Decide replacement.
         let pidx = prev_non_ws_idx(&node.children, i);
         let nidx = next_non_ws_idx(&node.children, i);
-        let prev_ws = pidx.map(|p| node.children[p].is_whitespace()).unwrap_or(true);
-        let next_ws = nidx.map(|n| node.children[n].is_whitespace()).unwrap_or(true);
+        let prev_ws = pidx
+            .map(|p| node.children[p].is_whitespace())
+            .unwrap_or(true);
+        let next_ws = nidx
+            .map(|n| node.children[n].is_whitespace())
+            .unwrap_or(true);
 
         // Extract any trailing newline from the comment value.
         let nl = extract_trailing_nl(&node.children[i].value);
@@ -284,35 +310,49 @@ fn strip_comments(node: &mut Node) {
 }
 
 fn is_comment_node(n: &Node) -> bool {
-    n.kind == NodeKind::Comment
-        || n.ttype_in("Token.Comment")
+    n.kind == NodeKind::Comment || n.ttype_in("Token.Comment")
 }
 
 fn is_hint_node(n: &Node) -> bool {
     n.ttype == Some(ttype::COMMENT_MULTILINE_HINT)
         || n.ttype == Some(ttype::COMMENT_SINGLE_HINT)
         || (n.kind == NodeKind::Comment
-            && n.children.first().map(|c| {
-                c.ttype == Some(ttype::COMMENT_MULTILINE_HINT)
-                    || c.ttype == Some(ttype::COMMENT_SINGLE_HINT)
-            }).unwrap_or(false))
+            && n.children
+                .first()
+                .map(|c| {
+                    c.ttype == Some(ttype::COMMENT_MULTILINE_HINT)
+                        || c.ttype == Some(ttype::COMMENT_SINGLE_HINT)
+                })
+                .unwrap_or(false))
 }
 
 fn extract_trailing_nl(val: &str) -> Option<&str> {
     // Return the trailing newline sequence (CR/LF/CRLF) if present.
-    if val.ends_with("\r\n") { return Some("\r\n"); }
-    if val.ends_with('\n')   { return Some("\n"); }
-    if val.ends_with('\r')   { return Some("\r"); }
+    if val.ends_with("\r\n") {
+        return Some("\r\n");
+    }
+    if val.ends_with('\n') {
+        return Some("\n");
+    }
+    if val.ends_with('\r') {
+        return Some("\r");
+    }
     None
 }
 
 fn prev_non_ws_idx(_children: &[Node], idx: usize) -> Option<usize> {
-    if idx == 0 { return None; }
+    if idx == 0 {
+        return None;
+    }
     Some(idx - 1) // include whitespace — matches Python's skip_ws=False
 }
 
 fn next_non_ws_idx(children: &[Node], idx: usize) -> Option<usize> {
-    if idx + 1 < children.len() { Some(idx + 1) } else { None }
+    if idx + 1 < children.len() {
+        Some(idx + 1)
+    } else {
+        None
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -337,13 +377,18 @@ fn strip_whitespace_inner(node: &mut Node, depth: usize) {
 
     match node.kind {
         NodeKind::IdentifierList => stripws_identifierlist(node),
-        NodeKind::Parenthesis    => stripws_parenthesis(node),
-        _                        => stripws_default(node),
+        NodeKind::Parenthesis => stripws_parenthesis(node),
+        _ => stripws_default(node),
     }
 
     // Top-level: drop trailing whitespace.
     if depth == 0 {
-        while node.children.last().map(|n| n.is_whitespace()).unwrap_or(false) {
+        while node
+            .children
+            .last()
+            .map(|n| n.is_whitespace())
+            .unwrap_or(false)
+        {
             node.children.pop();
         }
     }
@@ -355,7 +400,11 @@ fn stripws_default(node: &mut Node) {
     let mut is_first = true;
     for tok in &mut node.children {
         if tok.is_whitespace() {
-            tok.value = if last_was_ws || is_first { String::new() } else { " ".to_owned() };
+            tok.value = if last_was_ws || is_first {
+                String::new()
+            } else {
+                " ".to_owned()
+            };
         }
         last_was_ws = tok.is_whitespace();
         is_first = false;
@@ -411,12 +460,16 @@ fn spaces_around_operators(node: &mut Node) {
     while i < node.children.len() {
         let is_op = node.children[i].ttype_in(ttype::OPERATOR)
             || node.children[i].ttype_in(ttype::OPERATOR_COMPARISON);
-        if !is_op { i += 1; continue; }
+        if !is_op {
+            i += 1;
+            continue;
+        }
 
         // Ensure space after operator.
         let nidx = i + 1;
         if nidx < node.children.len() && !node.children[nidx].is_whitespace() {
-            node.children.insert(nidx, Node::leaf(ttype::WHITESPACE, " "));
+            node.children
+                .insert(nidx, Node::leaf(ttype::WHITESPACE, " "));
         }
         // Ensure space before operator.
         if i > 0 && !node.children[i - 1].is_whitespace() {
@@ -433,7 +486,7 @@ fn spaces_around_operators(node: &mut Node) {
 // ──────────────────────────────────────────────────────────────────────────
 
 struct Reindenter<'a> {
-    opts:  &'a FormatOptions,
+    opts: &'a FormatOptions,
     indent: isize,
     offset: isize,
     /// Running length (in chars) of the current output line — the forward
@@ -448,9 +501,20 @@ struct Reindenter<'a> {
 }
 
 const SPLIT_WORDS: &[&str] = &[
-    "FROM", "STRAIGHT_JOIN$", "JOIN$", "AND", "OR",
-    "GROUP BY", "ORDER BY", "UNION", "VALUES",
-    "SET", "BETWEEN", "EXCEPT", "HAVING", "LIMIT",
+    "FROM",
+    "STRAIGHT_JOIN$",
+    "JOIN$",
+    "AND",
+    "OR",
+    "GROUP BY",
+    "ORDER BY",
+    "UNION",
+    "VALUES",
+    "SET",
+    "BETWEEN",
+    "EXCEPT",
+    "HAVING",
+    "LIMIT",
 ];
 
 /// Python `_next_token` matches split words with `Token.match(regex=True)`
@@ -459,7 +523,9 @@ const SPLIT_WORDS: &[&str] = &[
 /// identity check excludes DML/DDL and dotted keyword types). `JOIN$` and
 /// `STRAIGHT_JOIN$` are end-anchored.
 fn is_split_word(n: &Node) -> bool {
-    if n.ttype != Some(ttype::KEYWORD) { return false; }
+    if n.ttype != Some(ttype::KEYWORD) {
+        return false;
+    }
     let norm = n.normalized();
     SPLIT_WORDS.iter().any(|w| match w.strip_suffix('$') {
         Some(base) => norm.ends_with(base),
@@ -481,7 +547,8 @@ fn reindent(stmt: &mut Node, opts: &FormatOptions, prefix: &str) {
     // (`\n\n`, or `\n` when the previous statement ends with a newline)
     // AFTER _process() — so the split helpers never see or eat it.
     if !prefix.is_empty() {
-        stmt.children.insert(0, Node::leaf(ttype::WHITESPACE, prefix));
+        stmt.children
+            .insert(0, Node::leaf(ttype::WHITESPACE, prefix));
         stmt.sync_value();
     }
 }
@@ -493,29 +560,27 @@ impl<'a> Reindenter<'a> {
 
     fn nl(&self, extra: isize) -> Node {
         let spaces = std::cmp::max(0, self.leading_ws() + extra) as usize;
-        let indent_str: String = std::iter::repeat(self.opts.indent_char())
-            .take(spaces)
-            .collect();
+        let indent_str: String = std::iter::repeat_n(self.opts.indent_char(), spaces).collect();
         Node::leaf(ttype::WHITESPACE, &format!("\n{}", indent_str))
     }
 
     fn process(&mut self, node: &mut Node) {
         self.stack.push(node.kind.clone());
         match node.kind {
-            NodeKind::Where          => self.process_where(node),
-            NodeKind::Parenthesis    => self.process_parenthesis(node),
-            NodeKind::Function       => self.process_function(node),
+            NodeKind::Where => self.process_where(node),
+            NodeKind::Parenthesis => self.process_parenthesis(node),
+            NodeKind::Function => self.process_function(node),
             NodeKind::IdentifierList => self.process_identifierlist(node),
-            NodeKind::Case           => self.process_case(node),
-            NodeKind::Values         => self.process_values(node),
-            _                        => self.process_default(node, true),
+            NodeKind::Case => self.process_case(node),
+            NodeKind::Values => self.process_values(node),
+            _ => self.process_default(node, true),
         }
         self.stack.pop();
     }
 
     /// Update the running line length with a leaf value (break-aware).
     fn fold(&mut self, v: &str) {
-        match v.rfind(|c| c == '\n' || c == '\r') {
+        match v.rfind(['\n', '\r']) {
             Some(pos) => self.line_len = v[pos + 1..].chars().count(),
             None => self.line_len += v.chars().count(),
         }
@@ -526,7 +591,9 @@ impl<'a> Reindenter<'a> {
     /// is folded exactly once, in document order. Folding is break-aware,
     /// which makes pre-folded `nl` values idempotent.
     fn process_default(&mut self, node: &mut Node, stmts: bool) {
-        if stmts { self.split_statements(node); }
+        if stmts {
+            self.split_statements(node);
+        }
         self.split_kwds(node);
         for i in 0..node.children.len() {
             let mut child = std::mem::replace(&mut node.children[i], Node::leaf(ttype::ERROR, ""));
@@ -538,7 +605,7 @@ impl<'a> Reindenter<'a> {
             node.children[i] = child;
         }
         node.sync_value();
- }
+    }
 
     fn split_statements(&mut self, node: &mut Node) {
         let mut i = 0;
@@ -584,24 +651,23 @@ impl<'a> Reindenter<'a> {
                     skip_next_and = false;
                     if norm == "AND" {
                         i += 1;
-                        continue;            // consumed, no break
+                        continue; // consumed, no break
                     }
                     // not an AND: fall through and break normally
                 }
                 if norm.contains("BETWEEN") {
                     skip_next_and = true;
                     i += 1;
-                    continue;                // BETWEEN never breaks
+                    continue; // BETWEEN never breaks
                 }
                 // Remove preceding whitespace.
                 if i > 0 && node.children[i - 1].is_whitespace() {
                     node.children.remove(i - 1);
                     i = i.saturating_sub(1);
                 }
-                let prev_ends_nl = i > 0 && (
-                    node.children[i - 1].value.ends_with('\n')
-                    || node.children[i - 1].value.ends_with('\r')
-                );
+                let prev_ends_nl = i > 0
+                    && (node.children[i - 1].value.ends_with('\n')
+                        || node.children[i - 1].value.ends_with('\r'));
                 if !prev_ends_nl {
                     let nl = self.nl(0);
                     node.children.insert(i, nl);
@@ -615,9 +681,11 @@ impl<'a> Reindenter<'a> {
 
     fn process_where(&mut self, node: &mut Node) {
         // Insert newline before WHERE keyword.
-        if let Some(wi) = node.children.iter().position(|n| {
-            n.match_token(ttype::KEYWORD, Some(&["WHERE"]))
-        }) {
+        if let Some(wi) = node
+            .children
+            .iter()
+            .position(|n| n.match_token(ttype::KEYWORD, Some(&["WHERE"])))
+        {
             let nl = self.nl(0);
             node.children.insert(wi, nl);
             node.sync_value();
@@ -629,11 +697,19 @@ impl<'a> Reindenter<'a> {
 
     fn process_parenthesis(&mut self, node: &mut Node) {
         // Python: first = token_next_by(m=M_OPEN); if absent, nothing to do.
-        let has_open = node.children.first().map(|c| c.value == "(").unwrap_or(false);
-        if !has_open { return; }
+        let has_open = node
+            .children
+            .first()
+            .map(|c| c.value == "(")
+            .unwrap_or(false);
+        if !has_open {
+            return;
+        }
         // Python `is_dml_dll` is truthy when a DML *or* DDL keyword is found.
-        let is_dml = node.children.iter().any(|c|
-            c.ttype_in(ttype::KEYWORD_DML) || c.ttype_in(ttype::KEYWORD_DDL));
+        let is_dml = node
+            .children
+            .iter()
+            .any(|c| c.ttype_in(ttype::KEYWORD_DML) || c.ttype_in(ttype::KEYWORD_DDL));
         // Python: `with indent(self, 1 if is_dml_dll else 0)` — the indent is
         // already raised when the leading newline is built.
         if is_dml {
@@ -654,7 +730,9 @@ impl<'a> Reindenter<'a> {
         self.offset += off;
         self.process_default(node, !is_dml);
         self.offset -= off;
-        if is_dml { self.indent -= 1; }
+        if is_dml {
+            self.indent -= 1;
+        }
     }
 
     fn process_function(&mut self, node: &mut Node) {
@@ -665,9 +743,11 @@ impl<'a> Reindenter<'a> {
 
     fn process_identifierlist(&mut self, node: &mut Node) {
         // get_identifiers(): non-whitespace, non-comma children.
-        let idents: Vec<usize> = node.children.iter().enumerate()
-            .filter(|(_, c)| !c.is_whitespace()
-                && !c.match_token(ttype::PUNCTUATION, Some(&[","])))
+        let idents: Vec<usize> = node
+            .children
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| !c.is_whitespace() && !c.match_token(ttype::PUNCTUATION, Some(&[","])))
             .map(|(i, _)| i)
             .collect();
 
@@ -684,8 +764,8 @@ impl<'a> Reindenter<'a> {
 
         // Python `within()`: proper ancestors only. The stack holds this
         // IdentifierList as well, but it can never equal Function/Values.
-        let in_function = self.stack.iter().any(|k| *k == NodeKind::Function);
-        let in_values   = self.stack.iter().any(|k| *k == NodeKind::Values);
+        let in_function = self.stack.contains(&NodeKind::Function);
+        let in_values = self.stack.contains(&NodeKind::Values);
 
         if !in_function && !in_values {
             if idents.is_empty() {
@@ -693,7 +773,11 @@ impl<'a> Reindenter<'a> {
                 return;
             }
             let num_offset: isize = if self.opts.indent_columns {
-                if self.opts.indent_tabs { 1 } else { self.opts.indent_width as isize }
+                if self.opts.indent_tabs {
+                    1
+                } else {
+                    self.opts.indent_width as isize
+                }
             } else {
                 // first = next(identifiers.pop(0).flatten()); num_offset =
                 // _get_offset(first) — line length before the first
@@ -717,13 +801,12 @@ impl<'a> Reindenter<'a> {
                         // Python: comma = token_prev(idx, skip_ws=True) — walk
                         // back over whitespace to the comma.
                         let mut comma_at = idx + shift;
-                        while comma_at >= 1
-                            && node.children[comma_at - 1].is_whitespace()
-                        {
+                        while comma_at >= 1 && node.children[comma_at - 1].is_whitespace() {
                             comma_at -= 1;
                         }
-                        if comma_at >= 1 && node.children[comma_at - 1]
-                            .match_token(ttype::PUNCTUATION, Some(&[","]))
+                        if comma_at >= 1
+                            && node.children[comma_at - 1]
+                                .match_token(ttype::PUNCTUATION, Some(&[","]))
                         {
                             let nl = self.nl(-2);
                             node.children.insert(comma_at - 1, nl);
@@ -731,11 +814,14 @@ impl<'a> Reindenter<'a> {
                             shift += 1;
                             // ensure whitespace after the comma
                             let after_comma = comma_at + 1;
-                            let needs_ws = node.children.get(after_comma)
-                                .map(|c| !c.is_whitespace()).unwrap_or(false);
+                            let needs_ws = node
+                                .children
+                                .get(after_comma)
+                                .map(|c| !c.is_whitespace())
+                                .unwrap_or(false);
                             if needs_ws {
-                                node.children.insert(after_comma,
-                                    Node::leaf(ttype::WHITESPACE, " "));
+                                node.children
+                                    .insert(after_comma, Node::leaf(ttype::WHITESPACE, " "));
                                 shift += 1;
                             }
                         }
@@ -755,34 +841,47 @@ impl<'a> Reindenter<'a> {
             let mut ins_ws: Vec<usize> = Vec::new();
             for i in 0..node.children.len() {
                 if node.children[i].match_token(ttype::PUNCTUATION, Some(&[","])) {
-                    let is_ws = node.children.get(i + 1)
-                        .map(|c| c.is_whitespace()).unwrap_or(true);
-                    if !is_ws { ins_ws.push(i + 1); }
+                    let is_ws = node
+                        .children
+                        .get(i + 1)
+                        .map(|c| c.is_whitespace())
+                        .unwrap_or(true);
+                    if !is_ws {
+                        ins_ws.push(i + 1);
+                    }
                 }
             }
             for (k, at) in ins_ws.iter().enumerate() {
-                node.children.insert(at + k, Node::leaf(ttype::WHITESPACE, " "));
+                node.children
+                    .insert(at + k, Node::leaf(ttype::WHITESPACE, " "));
             }
-            if !ins_ws.is_empty() { node.sync_value(); }
+            if !ins_ws.is_empty() {
+                node.sync_value();
+            }
 
             // Recompute identifier indices after the ws insertion.
-            let idents2: Vec<usize> = node.children.iter().enumerate()
-                .filter(|(_, c)| !c.is_whitespace()
-                    && !c.match_token(ttype::PUNCTUATION, Some(&[","])))
+            let idents2: Vec<usize> = node
+                .children
+                .iter()
+                .enumerate()
+                .filter(|(_, c)| {
+                    !c.is_whitespace() && !c.match_token(ttype::PUNCTUATION, Some(&[","]))
+                })
                 .map(|(i, _)| i)
                 .collect();
 
-            let end_at: isize = self.offset + idents2.iter()
-                .map(|&i| node.children[i].value.chars().count() as isize + 1)
-                .sum::<isize>();
+            let end_at: isize = self.offset
+                + idents2
+                    .iter()
+                    .map(|&i| node.children[i].value.chars().count() as isize + 1)
+                    .sum::<isize>();
             let mut adjusted: isize = 0;
-            if self.opts.wrap_after > 0
-                && end_at > self.opts.wrap_after as isize - self.offset
-                && self.last_func_len.is_some()
-            {
-                adjusted = -(self.last_func_len.unwrap() as isize) - 1;
+            if self.opts.wrap_after > 0 && end_at > self.opts.wrap_after as isize - self.offset {
+                if let Some(func_len) = self.last_func_len {
+                    adjusted = -(func_len as isize) - 1;
+                }
             }
-            self.indent += 1;                       // `with indent(self)`
+            self.indent += 1; // `with indent(self)`
             if adjusted < 0 {
                 if let Some(&first) = idents2.first() {
                     let nl = self.nl(0);
@@ -790,7 +889,7 @@ impl<'a> Reindenter<'a> {
                     node.sync_value();
                 }
             }
-            self.offset += adjusted;                // `with offset(self, adjusted)`
+            self.offset += adjusted; // `with offset(self, adjusted)`
             let mut shift2 = 0usize;
             let mut position: usize = 0;
             for &idx in &idents2 {
@@ -821,7 +920,9 @@ impl<'a> Reindenter<'a> {
         let mut cases: Vec<(Option<Vec<usize>>, Vec<usize>)> = Vec::new();
         let mut mode = 1; // 1 = CONDITION, 2 = VALUE, 0 = none
         for (i, tok) in node.children.iter().enumerate() {
-            if tok.match_token(ttype::KEYWORD, Some(&["CASE"])) { continue; }
+            if tok.match_token(ttype::KEYWORD, Some(&["CASE"])) {
+                continue;
+            }
             if tok.match_token(ttype::KEYWORD, Some(&["WHEN"])) {
                 cases.push((Some(Vec::new()), Vec::new()));
                 mode = 1;
@@ -833,14 +934,21 @@ impl<'a> Reindenter<'a> {
             } else if tok.match_token(ttype::KEYWORD, Some(&["END"])) {
                 mode = 0;
             }
-            if mode == 0 { continue; }
+            if mode == 0 {
+                continue;
+            }
             if cases.is_empty() {
                 cases.push((Some(Vec::new()), Vec::new()));
             }
             match mode {
-                1 => { if let Some(Some(cond)) = cases.last_mut().map(|c| &mut c.0) {
-                          cond.push(i); } }
-                2 => { cases.last_mut().unwrap().1.push(i); }
+                1 => {
+                    if let Some(Some(cond)) = cases.last_mut().map(|c| &mut c.0) {
+                        cond.push(i);
+                    }
+                }
+                2 => {
+                    cases.last_mut().unwrap().1.push(i);
+                }
                 _ => {}
             }
         }
@@ -875,10 +983,18 @@ impl<'a> Reindenter<'a> {
         self.offset += off2;
         let mut shift = 0usize;
         for (cond, value) in cases.iter().skip(1) {
-            let cond_len: usize = cond.as_ref().map(|cs|
-                cs.iter().map(|&i| node.children[i].value.chars().count()).sum::<usize>()).unwrap_or(0);
-            let value_len: usize = value.iter()
-                .map(|&i| node.children[i].value.chars().count()).sum::<usize>();
+            let cond_len: usize = cond
+                .as_ref()
+                .map(|cs| {
+                    cs.iter()
+                        .map(|&i| node.children[i].value.chars().count())
+                        .sum::<usize>()
+                })
+                .unwrap_or(0);
+            let value_len: usize = value
+                .iter()
+                .map(|&i| node.children[i].value.chars().count())
+                .sum::<usize>();
             let end_pos = self.offset + 1 + cond_len as isize + value_len as isize;
             if !self.opts.compact && end_pos > self.opts.wrap_after as isize {
                 let at = match cond {
@@ -892,15 +1008,17 @@ impl<'a> Reindenter<'a> {
                 shift += 1;
             }
         }
-        self.offset += "WHEN ".len() as isize;      // `with offset(self, len("WHEN "))`
+        self.offset += "WHEN ".len() as isize; // `with offset(self, len("WHEN "))`
         self.process_default(node, false);
         self.offset -= "WHEN ".len() as isize;
         self.offset -= off2;
         // END newline: python computes it inside the off1 context but
         // outside the off2 context.
         if !self.opts.compact {
-            if let Some(end_idx) = node.children.iter().position(|t|
-                t.match_token(ttype::KEYWORD, Some(&["END"])))
+            if let Some(end_idx) = node
+                .children
+                .iter()
+                .position(|t| t.match_token(ttype::KEYWORD, Some(&["END"])))
             {
                 let nl = self.nl(0);
                 node.children.insert(end_idx, nl);
@@ -930,13 +1048,17 @@ impl<'a> Reindenter<'a> {
             let is_group = node.children[i].is_group();
             if is_group {
                 if node.children[i].kind == NodeKind::Parenthesis {
-                    if first_row_ll.is_none() { first_row_ll = Some(ll); }
-                    if last_row_ll.is_none() { last_row_ll = Some(ll); }
+                    if first_row_ll.is_none() {
+                        first_row_ll = Some(ll);
+                    }
+                    if last_row_ll.is_none() {
+                        last_row_ll = Some(ll);
+                    }
                 }
                 ll += node.children[i].value.chars().count();
             } else {
                 let v = node.children[i].value.clone();
-                match v.rfind(|ch| ch == '\n' || ch == '\r') {
+                match v.rfind(['\n', '\r']) {
                     Some(p) => ll = v[p + 1..].chars().count(),
                     None => ll += v.chars().count(),
                 }
@@ -959,9 +1081,7 @@ impl<'a> Reindenter<'a> {
                             let extra = row_ll as isize - self.leading_ws();
                             let nl = self.nl(extra);
                             let mut at = i + 1;
-                            while at < node.children.len()
-                                && node.children[at].is_whitespace()
-                            {
+                            while at < node.children.len() && node.children[at].is_whitespace() {
                                 at += 1;
                             }
                             node.children.insert(at, nl);
@@ -1018,7 +1138,7 @@ pub fn serialize_text(text: &str) -> String {
                     }
                     lines.push(String::new());
                     if c == '\r' && chars.peek() == Some(&'\n') {
-                        chars.next();   // \r\n is one break
+                        chars.next(); // \r\n is one break
                     }
                 }
                 '\'' | '"' => {
@@ -1032,7 +1152,11 @@ pub fn serialize_text(text: &str) -> String {
     if !cur.is_empty() {
         lines.last_mut().unwrap().push_str(&cur);
     }
-    lines.iter().map(|l| l.trim_end()).collect::<Vec<_>>().join("\n")
+    lines
+        .iter()
+        .map(|l| l.trim_end())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -1043,12 +1167,16 @@ fn apply_output_format(sql: &str, fmt: &OutputFormat, count: usize) -> String {
     match fmt {
         OutputFormat::Sql => sql.to_owned(),
         OutputFormat::Python => output_python(sql, count),
-        OutputFormat::Php    => output_php(sql, count),
+        OutputFormat::Php => output_php(sql, count),
     }
 }
 
 fn output_python(sql: &str, count: usize) -> String {
-    let varname = if count > 1 { format!("sql{}", count) } else { "sql".to_owned() };
+    let varname = if count > 1 {
+        format!("sql{}", count)
+    } else {
+        "sql".to_owned()
+    };
     let has_nl = sql.trim().contains('\n');
     let escaped = sql.replace('\\', "\\\\").replace('\'', "\\'");
 
@@ -1072,7 +1200,11 @@ fn output_python(sql: &str, count: usize) -> String {
 }
 
 fn output_php(sql: &str, count: usize) -> String {
-    let varname = if count > 1 { format!("$sql{}", count) } else { "$sql".to_owned() };
+    let varname = if count > 1 {
+        format!("$sql{}", count)
+    } else {
+        "$sql".to_owned()
+    };
     let has_nl = sql.trim().contains('\n');
     let escaped = sql.replace('\\', "\\\\").replace('"', "\\\"");
 

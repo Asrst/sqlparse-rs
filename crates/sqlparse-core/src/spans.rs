@@ -44,7 +44,7 @@ impl DelimitedSpans {
 const COMMENT_TAG: &str = "/*";
 
 pub fn find(chars: &[char]) -> DelimitedSpans {
-    let has_dollar = chars.iter().any(|&c| c == '$');
+    let has_dollar = chars.contains(&'$');
     let has_comment_open = chars.windows(2).any(|w| w[0] == '/' && w[1] == '*');
     let mut openers: HashMap<usize, (usize, String, &'static str)> = HashMap::new();
     let mut closers: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
@@ -59,10 +59,7 @@ pub fn find(chars: &[char]) -> DelimitedSpans {
             if chars[i] == '$' {
                 if let Some((tag_end, tag)) = match_dollar_tag(chars, i) {
                     // Every occurrence is a potential closer.
-                    closers
-                        .entry(tag.clone())
-                        .or_default()
-                        .push((i, tag_end));
+                    closers.entry(tag.clone()).or_default().push((i, tag_end));
                     // Opener only if NOT preceded by \w, `"` or `$`.
                     let opener_ok = i == 0 || {
                         let p = chars[i - 1];
@@ -85,7 +82,14 @@ pub fn find(chars: &[char]) -> DelimitedSpans {
         let mut i = 0usize;
         while i + 2 < n {
             if chars[i] == '/' && chars[i + 1] == '*' && chars[i + 2] == '+' {
-                openers.insert(i, (i + 3, COMMENT_TAG.to_string(), ttype::COMMENT_MULTILINE_HINT));
+                openers.insert(
+                    i,
+                    (
+                        i + 3,
+                        COMMENT_TAG.to_string(),
+                        ttype::COMMENT_MULTILINE_HINT,
+                    ),
+                );
                 i += 3;
             } else {
                 i += 1;
@@ -95,7 +99,10 @@ pub fn find(chars: &[char]) -> DelimitedSpans {
         let mut i = 0usize;
         while i + 1 < n {
             if chars[i] == '/' && chars[i + 1] == '*' && !(i + 2 < n && chars[i + 2] == '+') {
-                openers.insert(i, (i + 2, COMMENT_TAG.to_string(), ttype::COMMENT_MULTILINE));
+                openers.insert(
+                    i,
+                    (i + 2, COMMENT_TAG.to_string(), ttype::COMMENT_MULTILINE),
+                );
                 i += 2;
             } else {
                 i += 1;
