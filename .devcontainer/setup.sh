@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORKSPACE_ROOT="$(dirname "$SCRIPT_DIR")"
@@ -10,7 +10,8 @@ cd "$WORKSPACE_ROOT"
 npm install -g opencode-ai
 
 # Install IBM Bob Shell
-curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --package-manager npm
+bob --version
 
 # Verify opencode
 opencode --version
