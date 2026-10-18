@@ -379,6 +379,14 @@ cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 - **`split()` strips every statement**; `CASE...END` does NOT protect `;` — only `BEGIN...END` blocks do.
 - **`BEGIN TRANSACTION` / `BEGIN WORK`** must not open a block — only bare `BEGIN` does (issue826).
 
+### Limitations
+
+- **`reindent_aligned` and `right_margin` format options are unimplemented** — both return the SQL
+  unchanged. This matches real sqlparse too; they are no-ops in both implementations.
+- **Unicode:** Rust uses `char::is_alphanumeric` / `char::is_numeric` to approximate Python `re`
+  `\w`/`\d` semantics. Common Unicode identifiers (`中文`, `café`, `ß`) work correctly; exotic NFD
+  combining marks may produce different token boundaries on malformed input.
+
 ## License
 
 BSD-3-Clause; see LICENSE. Derivative work of
