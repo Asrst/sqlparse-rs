@@ -122,4 +122,10 @@ def install():
 
     _sqlparse.format = _format_rust
 
+    # ── parsestream() patch — native, no sqlparse engine ──────────────────
+
+    from sqlparse_rs._stream import parsestream as _native_parsestream
+
+    _sqlparse.parsestream = _native_parsestream
+
     _INSTALLED = True

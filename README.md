@@ -12,7 +12,7 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a si
 | 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
 | 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens, grouping, and formatter |
 | 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; no Python grouping engine |
-| 3 | Own `sql` / `tokens` modules | ✅ Complete — no `sqlparse` runtime dependency |
+| 3 | Own `sql` / `tokens` / `parsestream` | ✅ Complete — zero `sqlparse` runtime dependency |
 
 ## Benchmark
 
@@ -235,9 +235,6 @@ sqlparse.tokenize("SELECT id, name FROM users WHERE id = 1")
 
 ### `parsestream()` — parse a stream of statements
 
-> **Requires `sqlparse`** (dev dependency). `parsestream()` delegates to sqlparse's filter-stack
-> engine with the Rust lexer patched in.
-
 ```python
 import sqlparse_rs as sqlparse
 
@@ -312,8 +309,9 @@ When `sqlparse` is installed, `import sqlparse_rs` also patches its lexer so
 ```
 pyproject.toml                maturin build config (mixed Rust/Python layout)
 python/sqlparse_rs/
-  __init__.py               re-exports tokenize/split/parse/format; optional sqlparse patch
+  __init__.py               re-exports tokenize/split/parse/format/parsestream; optional patch
   _patch.py                 optional monkey-patch of sqlparse.lexer.Lexer.get_tokens
+  _stream.py                native parsestream() — StatementSplitter + Rust grouping
   sql.py                    pure-Python AST node classes (no sqlparse dep)
   tokens.py                 pure-Python _TokenType hierarchy (no sqlparse dep)
 crates/sqlparse-core/src/
@@ -346,7 +344,7 @@ maturin develop
 # Build optimised release .so
 maturin develop --release
 
-# All Python tests (67 total)
+# All Python tests (73 total)
 pytest tests/ -v
 
 # Single Python test
@@ -391,8 +389,6 @@ cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 
 ### Limitations
 
-- **`parsestream()` requires `sqlparse`.** It delegates to sqlparse's filter-stack engine with the
-  Rust lexer patched in. `split()`, `parse()`, `format()`, and `tokenize()` have no such dependency.
 - **`reindent_aligned` and `right_margin` format options are unimplemented** — both return the SQL
   unchanged. This matches real sqlparse too; they are no-ops in both implementations.
 - **Unicode:** Rust uses `char::is_alphanumeric` / `char::is_numeric` to approximate Python `re`

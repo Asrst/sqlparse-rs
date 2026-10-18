@@ -178,3 +178,49 @@ def test_tokens_droping_with_in_operator():
     assert T.Token.Keyword.DDL in T.Token.Keyword
     assert T.Token.Keyword in T.Token
     assert T.Token.Keyword.DML not in T.Token.Keyword.DDL
+
+
+# ── parsestream (native, no sqlparse) ────────────────────────────────────────
+
+def test_parsestream_from_string():
+    stmts = list(sqlparse_rs.parsestream("SELECT 1; SELECT 2"))
+    assert len(stmts) == 2
+    assert stmts[0].get_type() == "SELECT"
+    assert stmts[1].get_type() == "SELECT"
+
+
+def test_parsestream_from_file():
+    import io
+    f = io.StringIO("SELECT 1; INSERT INTO t VALUES (2)")
+    stmts = list(sqlparse_rs.parsestream(f))
+    assert len(stmts) == 2
+    assert stmts[0].get_type() == "SELECT"
+    assert stmts[1].get_type() == "INSERT"
+
+
+def test_parsestream_lossless():
+    sql = "SELECT 1; INSERT INTO t VALUES (2)"
+    stmts = list(sqlparse_rs.parsestream(sql))
+    reconstructed = "".join(str(s) for s in stmts)
+    assert "SELECT" in reconstructed.upper()
+    assert "INSERT" in reconstructed.upper()
+
+
+def test_parsestream_single():
+    stmts = list(sqlparse_rs.parsestream("SELECT a FROM b"))
+    assert len(stmts) == 1
+    assert stmts[0].get_type() == "SELECT"
+
+
+def test_parsestream_begin_end_block():
+    # Standalone BEGIN; acts as a transaction boundary (issue826), not a block.
+    # Real sqlparse produces 4 statements here — match that behaviour.
+    sql = "BEGIN; SELECT 1; END; SELECT 2;"
+    stmts = list(sqlparse_rs.parsestream(sql))
+    assert len(stmts) == 4
+
+
+def test_parsestream_where_grouped():
+    stmts = list(sqlparse_rs.parsestream("SELECT a FROM t WHERE x = 1"))
+    where = [tok for tok in stmts[0].tokens if isinstance(tok, sql_mod.Where)]
+    assert len(where) == 1

@@ -1,8 +1,8 @@
 # sqlparse_rs — mixed Rust/Python package
 # The compiled extension lives at sqlparse_rs.sqlparse_rs (the .so inside this package).
-# This __init__.py re-exports tokenize/split/parse/format from the extension,
-# provides our own sql/tokens modules (no sqlparse dependency), and optionally
-# installs the lexer patch when sqlparse is available.
+# This __init__.py re-exports tokenize/split/parse/format/parsestream from the
+# extension, provides our own sql/tokens modules (no sqlparse dependency), and
+# optionally installs the lexer patch when sqlparse is available.
 
 from sqlparse_rs.sqlparse_rs import (  # noqa: F401
     tokenize,
@@ -11,6 +11,9 @@ from sqlparse_rs.sqlparse_rs import (  # noqa: F401
     format,
     __version__,
 )
+
+# Native parsestream() — no sqlparse dependency.
+from sqlparse_rs._stream import parsestream  # noqa: F401
 
 # Our own pure-Python sql / tokens modules (no sqlparse dependency).
 from sqlparse_rs import sql    # noqa: F401
