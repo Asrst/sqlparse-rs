@@ -11,8 +11,8 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement**.
 | 1 | Lexer / tokenizer | ✅ Complete — 6.8× faster, byte-identical to sqlparse 0.6.0 |
 | 1 | Statement splitter (`split()`) | ✅ Complete — BEGIN/END blocks, GO, dollar-quotes, issues 762/809/826 |
 | 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
-| 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Python grouping/formatting over Rust tokens |
-| 3 | Full Rust grouping + formatter | 🔜 Future (Python grouping is the current hot-path for correctness) |
+| 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens; `parse()`/`format()` use Rust grouping (Tier 3) |
+| 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; `parse()`/`format()` no longer touch Python's grouping engine |
 
 **Drop-in today:** `import sqlparse_rs` once (or at startup), then `import sqlparse` works
 unchanged — same `parse()`, `format()`, `split()`, `parsestream()`, `tokenize()` signatures.
@@ -161,8 +161,8 @@ cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 - Unicode: Python `re` `\w`/`\d` semantics approximated (`is_alphanumeric`/`is_numeric`);
   combining marks may differ on exotic NFD input. ASCII SQL is unaffected.
 - `Lexer.add_keywords()` runtime customisation not exposed — regenerate `keywords.rs` instead.
-- Grouping and formatting use Python sqlparse's engine (not Rust) — speedup applies to tokenize
-  and split only; parse+format are faster at the tokenize layer but grouping is still Python.
+- `parsestream()` still uses Python's `FilterStack`/`StatementSplitter` internally; only `parse()` and `format()` are fully Rust.
+- `reindent_aligned` and `right_margin` format options fall back to Python sqlparse (rare options).
 
 ## License
 

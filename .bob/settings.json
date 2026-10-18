@@ -1,5 +1,17 @@
 {
   "tools": {
     "allowed": ["run_shell_command"]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .bob/hooks/save-session.mjs"
+          }
+        ]
+      }
+    ]
   }
 }

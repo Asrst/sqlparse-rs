@@ -16,6 +16,7 @@ pub const GENERIC_COMMAND: &str = "Token.Generic.Command";
 pub const KEYWORD: &str = "Token.Keyword";
 pub const KEYWORD_DML: &str = "Token.Keyword.DML";
 pub const KEYWORD_DDL: &str = "Token.Keyword.DDL";
+pub const KEYWORD_CTE: &str = "Token.Keyword.CTE";
 pub const KEYWORD_ORDER: &str = "Token.Keyword.Order";
 pub const KEYWORD_TZCAST: &str = "Token.Keyword.TZCast";
 pub const NAME_BUILTIN: &str = "Token.Name.Builtin";

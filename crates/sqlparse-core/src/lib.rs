@@ -1,10 +1,13 @@
 //! sqlparse-rs core — Rust port of python-sqlparse 0.6.0 hot paths.
 //!
-//! * [`lexer::tokenize`] — Tier 1: flat `(ttype, value)` token stream,
-//!   byte-identical to Python `Lexer.get_default_instance().tokenize(sql)`
-//!   (verified by differential tests against the real oracle).
-//! * [`splitter::split`] — Tier 2: statement splitting, identical to
+//! * [`lexer::tokenize`]  — Tier 1: flat `(ttype, value)` token stream,
+//!   byte-identical to Python `Lexer.get_default_instance().tokenize(sql)`.
+//! * [`splitter::split`]  — Tier 2: statement splitting, identical to
 //!   Python `sqlparse.split()`.
+//! * [`grouping`]         — Tier 3: full AST grouping (port of grouping.py
+//!   and sql.py).
+//! * [`formatter`]        — Tier 3: full formatter (port of formatter.py and
+//!   all its filters).
 //!
 //! Design notes:
 //! * Token types are `&'static str` exactly matching Python's `str(ttype)`
@@ -16,11 +19,15 @@
 //!   `tools/dump_regex_table.py`) is the spec.
 //! * `#![forbid(unsafe_code)]`.
 
+pub mod formatter;
+pub mod grouping;
 pub mod keywords;
 pub mod lexer;
 pub mod splitter;
 pub mod spans;
 pub mod ttype;
 
+pub use formatter::{format_sql, FormatOptions, CaseMode, OutputFormat};
+pub use grouping::{group, tokens_to_statement, get_type, Node, NodeKind};
 pub use lexer::tokenize;
 pub use splitter::split;

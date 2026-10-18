@@ -1,12 +1,12 @@
 # sqlparse_rs._patch
-# Monkey-patches sqlparse's lexer to use the Rust tokenizer.
+# Monkey-patches sqlparse's lexer AND top-level parse/format to use Rust.
 # Safe to call multiple times (idempotent).
 
 _INSTALLED = False
 
 
 def install():
-    """Patch sqlparse.lexer so get_tokens() calls Rust instead of Python regex."""
+    """Patch sqlparse so tokenize/parse/format all call Rust instead of Python."""
     global _INSTALLED
     if _INSTALLED:
         return
@@ -14,11 +14,18 @@ def install():
     try:
         import sqlparse.lexer as _lex_mod
         import sqlparse.tokens as _T
+        import sqlparse as _sqlparse
     except ImportError:
         # sqlparse not installed — nothing to patch
         return
 
-    from sqlparse_rs.sqlparse_rs import tokenize as _rust_tokenize_raw
+    from sqlparse_rs.sqlparse_rs import (
+        tokenize as _rust_tokenize_raw,
+        parse    as _rust_parse,
+        format   as _rust_format,
+    )
+
+    # ── Lexer patch (unchanged from before) ──────────────────────────────
 
     # Cache ttype-string → _TokenType objects to avoid repeated attribute traversal.
     _ttype_cache: dict = {}
@@ -70,5 +77,24 @@ def install():
         _fs.lexer = sqlparse.lexer  # repoint to patched module
     except Exception:
         pass
+
+    # ── parse() patch — Rust grouping ─────────────────────────────────────
+    # Replace sqlparse.parse with the Rust implementation that builds the
+    # full AST (tokenize → group) in Rust and returns sqlparse.sql objects.
+
+    def _parse_rust(sql: str, encoding=None):
+        """Drop-in for sqlparse.parse — Rust tokenize + Rust grouping."""
+        return _rust_parse(sql, encoding)
+
+    _sqlparse.parse = _parse_rust
+
+    # ── format() patch — fully Rust ───────────────────────────────────────
+    # Replace sqlparse.format with the Rust implementation.
+
+    def _format_rust(sql: str, encoding=None, **options):
+        """Drop-in for sqlparse.format — fully in Rust."""
+        return _rust_format(sql, encoding, **options)
+
+    _sqlparse.format = _format_rust
 
     _INSTALLED = True
