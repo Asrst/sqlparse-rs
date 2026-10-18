@@ -2,7 +2,7 @@
 # sqlparse-rs
 
 A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0 exposed to Python
-via [PyO3](https://github.com/PyO3/pyo3) — designed as a **drop-in replacement**.
+via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement**.
 
 ## Status
 
@@ -10,13 +10,13 @@ via [PyO3](https://github.com/PyO3/pyo3) — designed as a **drop-in replacement
 |------|-----------|--------|
 | 1 | Lexer / tokenizer | ✅ Complete — 6.8× faster, byte-identical to sqlparse 0.6.0 |
 | 1 | Statement splitter (`split()`) | ✅ Complete — BEGIN/END blocks, GO, dollar-quotes, issues 762/809/826 |
-| 2 | PyO3 bindings (`parse()`, `tokenize()`) | ✅ Working MVP |
-| 3 | AST grouping (`parse()` full tree) | 🚧 In progress |
-| 3 | Formatter (`format()`) | 🚧 In progress |
+| 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
+| 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Python grouping/formatting over Rust tokens |
+| 3 | Full Rust grouping + formatter | 🔜 Future (Python grouping is the current hot-path for correctness) |
 
-**Drop-in target:** `import sqlparse` works unchanged — same `parse()`, `format()`, `split()`,
-`parsestream()`, `tokenize()` signatures, same token type hierarchy, same `Statement`/`Identifier`
-AST node classes.
+**Drop-in today:** `import sqlparse_rs` once (or at startup), then `import sqlparse` works
+unchanged — same `parse()`, `format()`, `split()`, `parsestream()`, `tokenize()` signatures.
+The Rust lexer is automatically wired into sqlparse's grouping and formatting engine.
 
 ## Benchmark (Tier 1 — lexer + splitter)
 
@@ -54,82 +54,91 @@ Requires Rust 1.75+ (tested with 1.99.1), Python 3.8+.
 ## Usage (drop-in)
 
 ```python
-# Existing code — no changes needed
+# One-time import at app startup (or in your conftest.py / __init__.py)
+import sqlparse_rs  # patches sqlparse's lexer automatically
+
+# Then use sqlparse exactly as before — no other changes needed
 import sqlparse
 
-# split
+# split — uses Rust state-machine splitter
 sqlparse.split("SELECT 1; SELECT 2")
 # → ['SELECT 1', 'SELECT 2']
 
-# parse
+# parse — Python grouping/AST over Rust tokens
 stmts = sqlparse.parse("SELECT a, b FROM users WHERE id = 1")
 stmt = stmts[0]
 print(stmt.get_type())  # 'SELECT'
 for tok in stmt.flatten():
     print(tok.ttype, repr(tok.value))
 
-# format
+# format — Python formatter over Rust tokens
 sqlparse.format("select a,b from t", keyword_case="upper", reindent=True)
+
+# low-level tokenize — direct Rust access
+import sqlparse_rs
+list(sqlparse_rs.tokenize("SELECT 1"))
+# → [('Token.Keyword.DML', 'SELECT'), ('Token.Text.Whitespace', ' '), ...]
 ```
 
 ## Repo layout
 
 ```
-Cargo.toml                pure Rust crate config (cdylib)
-pyproject.toml            maturin build config; module-name = "sqlparse._rust"
-python/sqlparse/          Python shim package (the drop-in layer)
-  __init__.py             re-exports parse/format/split/parsestream
-  sql.py                  re-exports PyO3 AST node classes
-  tokens.py               token type hierarchy (delegates to sqlparse.tokens)
-  exceptions.py           SQLParseError
-src/
-  lib.rs                  PyO3 module entry point
-  keywords.rs             803-entry keyword table (GENERATED — see tools/)
-  lexer.rs                50-rule scanner, SQL_REGEX order 1:1 with sqlparse
-  splitter.rs             statement_splitter.py port
-  grouping.rs             grouping passes (WIP)
-  formatter.rs            format() options (WIP)
-  sql_types.rs            PyO3 Token/TokenList/Statement/Identifier classes
+pyproject.toml                maturin build config (mixed Rust/Python layout)
+python/sqlparse_rs/
+  __init__.py               re-exports tokenize/split, installs Rust lexer patch
+  _patch.py                 monkey-patches sqlparse.lexer.Lexer.get_tokens
+crates/sqlparse-core/src/
+  ttype.rs                  &'static str token type constants
+  keywords.rs               GENERATED 803-entry keyword map + binary search
+  lexer.rs                  50-rule character scanner; zero-copy slices; O(n)
+  spans.rs                  find_delimited_spans prepass ($-quotes, /* */ hints)
+  splitter.rs               statement_splitter.py port; state machine
+  lib.rs                    pub use lexer::tokenize, splitter::split
+crates/sqlparse-py/src/lib.rs   PyO3 glue; exposes tokenize()+split() as sqlparse_rs
 tests/
-  test_compat.py          compatibility tests vs sqlparse
-corpus/sql/               micro-cases per lexer trap + realistic shapes
-corpus/goldens*.txt       committed golden outputs from real sqlparse 0.6.0
-tools/oracle.py           differential oracle (tokenize | split | words)
-tools/gen_keywords.py     keywords.rs generator (first-dict-wins priority)
-PORT_MATRIX.md            generated spec of the 50 lexer rules
-.bob/skills/
-  pyo3-maturin/           PyO3 0.22 + maturin reference skill
-  sqlparse-compat/        sqlparse public API compatibility reference skill
-.bob/mcp.json             MCP servers: crates-io, fetcher (docs.rs)
+  test_compat.py            compatibility tests vs sqlparse (45 tests)
+  test_wrapper.py           Rust parity vs real sqlparse, byte-identical
+corpus/sql/                 24 fixture files (committed)
+corpus/goldens.txt          committed tokenize goldens (real sqlparse 0.6.0)
+corpus/goldens-split.txt    committed split goldens
+tools/oracle.py             differential oracle (tokenize|split|words modes)
+tools/gen_keywords.py       regenerates keywords.rs
+PORT_MATRIX.md              generated spec of the 50 lexer rules
+docs/DECISIONS.md           architecture decisions
 ```
 
 ## Development commands
 
 ```bash
-# Regenerate keyword table from installed sqlparse
-python tools/gen_keywords.py > src/keywords.rs
+# Build debug .so + install Python package into venv (run from repo root)
+maturin develop
 
-# Regenerate golden files (referee outputs from real sqlparse)
-python tools/oracle.py tokenize < corpus/inputs.bin > corpus/goldens.txt
-python tools/oracle.py split    < corpus/inputs.bin > corpus/goldens_split.txt
-
-# Rust unit + differential tests
-cargo test
-
-# Build debug .so and run Python compat tests
-maturin develop && pytest tests/ -v
-
-# Build optimised .so
+# Build optimised release .so
 maturin develop --release
+
+# All Python tests
+pytest tests/ -v
+
+# Single Python test
+pytest tests/test_compat.py::test_split_begin_end_not_split -v
+
+# All Rust tests (unit + differential parity)
+cargo test -p sqlparse-core
+
+# Single Rust test
+cargo test -p sqlparse-core test_dollar_quoted -- --nocapture
+
+# Regenerate keyword table from installed sqlparse
+make gen-keywords
+
+# Regenerate golden files (requires real sqlparse in venv)
+make corpus goldens split-goldens
+
+# Run parity gate
+make check
 
 # Benchmark
 cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
-
-# Run a single Python test
-pytest tests/test_compat.py::test_split_begin_end_not_split -v
-
-# Run a single Rust test
-cargo test test_dollar_quoted -- --nocapture
 ```
 
 ## What was hard (and is now covered by tests)
@@ -147,10 +156,13 @@ cargo test test_dollar_quoted -- --nocapture
 
 ## Honest limitations
 
+- **`import sqlparse_rs` must precede the first `import sqlparse`** for the Rust lexer to be
+  active. In practice: add it to your `conftest.py`, app `__init__.py`, or entry-point.
 - Unicode: Python `re` `\w`/`\d` semantics approximated (`is_alphanumeric`/`is_numeric`);
   combining marks may differ on exotic NFD input. ASCII SQL is unaffected.
 - `Lexer.add_keywords()` runtime customisation not exposed — regenerate `keywords.rs` instead.
-- `format()` reindent and grouping are work-in-progress; fall back to Python sqlparse if needed.
+- Grouping and formatting use Python sqlparse's engine (not Rust) — speedup applies to tokenize
+  and split only; parse+format are faster at the tokenize layer but grouping is still Python.
 
 ## License
 

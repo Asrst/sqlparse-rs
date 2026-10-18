@@ -21,6 +21,7 @@ dev = ["pytest", "sqlparse==0.6.0"]
 [tool.maturin]
 manifest-path = "crates/sqlparse-py/Cargo.toml"
 module-name = "sqlparse_rs"
+python-source = "python"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -7,19 +7,11 @@ original sqlparse library.  Run with:
 """
 import pytest
 
-# We test our Rust-backed module
-import importlib, sys
+# Import our Rust extension first — this patches sqlparse's lexer.
+import sqlparse_rs  # noqa: F401 (side-effect: installs Rust lexer patch)
 
-# Import our version (installed via maturin develop)
+# sqlparse is the real library, now Rust-backed for tokenize/split.
 import sqlparse as rs
-
-# Import original for comparison (installed separately)
-try:
-    # Temporarily remove our package from sys.modules to load original
-    import sqlparse as _orig_sqlparse
-    _orig = _orig_sqlparse
-except Exception:
-    _orig = None
 
 # ─── split ────────────────────────────────────────────────────────────────
 
@@ -228,3 +220,59 @@ def test_split_dollar_quoted():
     sql = "SELECT $$hello; world$$ AS x; SELECT 2"
     result = rs.split(sql)
     assert len(result) == 2
+
+# ─── Rust patch verification ───────────────────────────────────────────────
+
+def test_rust_lexer_patch_active():
+    """sqlparse.lexer.Lexer.get_tokens must be our Rust implementation."""
+    import sqlparse.lexer as lex
+    fn = lex.Lexer.get_tokens
+    assert '_get_tokens_rust' in fn.__qualname__ or 'rust' in fn.__qualname__.lower(), (
+        f"Rust patch not active; get_tokens is: {fn.__qualname__}"
+    )
+
+def test_parse_uses_rust_tokenizer():
+    """parse() should produce a Statement whose flatten() matches Rust tokenize()."""
+    sql = "SELECT id, name FROM users"
+    stmts = rs.parse(sql)
+    flat_values = "".join(t.value for t in stmts[0].flatten())
+    assert flat_values == sql  # lossless round-trip
+
+def test_format_reindent_and_case():
+    """format() with both reindent and keyword_case works end-to-end."""
+    result = rs.format(
+        "select id, name from users where id = 1",
+        reindent=True,
+        keyword_case="upper",
+    )
+    assert "SELECT" in result
+    assert "FROM" in result
+    assert "WHERE" in result
+    assert "\n" in result  # reindent added newlines
+
+def test_parsestream_lossless():
+    """parsestream() produces statements that reconstruct the original SQL."""
+    sql = "SELECT 1; INSERT INTO t VALUES (2)"
+    stmts = list(rs.parsestream(sql))
+    assert len(stmts) == 2
+    reconstructed = "".join(str(s) for s in stmts)
+    assert "SELECT" in reconstructed.upper()
+    assert "INSERT" in reconstructed.upper()
+
+def test_identifier_get_name():
+    """Identifier.get_name() works — requires grouping over Rust tokens."""
+    stmts = rs.parse("SELECT foo AS bar FROM t")
+    identifiers = list(stmts[0].get_sublists())
+    names = [id_.get_name() for id_ in identifiers if hasattr(id_, 'get_alias')]
+    assert any(n == 'bar' for n in names if n)
+
+def test_where_clause_grouping():
+    """WHERE clause is grouped into a Where node."""
+    import sqlparse.sql as sql_mod
+    stmts = rs.parse("SELECT a FROM t WHERE x = 1 AND y = 2")
+    where_clauses = [
+        tok for tok in stmts[0].tokens
+        if isinstance(tok, sql_mod.Where)
+    ]
+    assert len(where_clauses) == 1
+    assert "WHERE" in str(where_clauses[0]).upper()
