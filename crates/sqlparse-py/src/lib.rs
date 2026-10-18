@@ -43,8 +43,8 @@ fn split(sql: &str) -> Vec<String> {
 fn node_to_py(py: Python<'_>, node: &grouping::Node) -> PyResult<PyObject> {
     use grouping::NodeKind;
 
-    let sql_mod  = py.import("sqlparse.sql")?;
-    let tok_mod  = py.import("sqlparse.tokens")?;
+    let sql_mod  = py.import("sqlparse_rs.sql")?;
+    let tok_mod  = py.import("sqlparse_rs.tokens")?;
 
     if node.is_leaf() {
         // Leaf → sqlparse.sql.Token(ttype, value)
@@ -118,7 +118,7 @@ fn parse(py: Python<'_>, sql: &str, encoding: Option<&str>) -> PyResult<PyObject
 
     // Handle edge case: empty input → single empty Statement.
     if sql.trim().is_empty() {
-        let sql_mod = py.import("sqlparse.sql")?;
+        let sql_mod = py.import("sqlparse_rs.sql")?;
         let empty_list = PyList::empty(py);
         let stmt = sql_mod.getattr("Statement")?.call1((empty_list,))?;
         let tup = PyTuple::new(py, &[stmt])?;

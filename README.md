@@ -39,6 +39,13 @@ maturin develop --release
 
 Requires Rust 1.75+, Python 3.8+.
 
+> **Why is `sqlparse` required?** `sqlparse_rs` is an accelerator, not a full replacement of
+> sqlparse's Python layer. `parse()` returns `sqlparse.sql.Statement` objects (Python classes
+> from the real package), `format()` uses sqlparse's formatter infrastructure, and
+> `import sqlparse_rs as sqlparse` re-exports sqlparse's sub-modules directly. The pure-Rust
+> functions `tokenize()` and `split()` work without sqlparse, but everything else depends on it
+> at runtime. `sqlparse==0.6.0` is a hard runtime dependency.
+
 ## Quick usage
 
 `sqlparse_rs` is a **complete replacement** — one import, no changes to the rest of your code.

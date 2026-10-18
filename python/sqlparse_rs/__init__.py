@@ -1,8 +1,8 @@
 # sqlparse_rs — mixed Rust/Python package
 # The compiled extension lives at sqlparse_rs.sqlparse_rs (the .so inside this package).
-# This __init__.py re-exports tokenize/split/parse/format from the extension and
-# installs the lexer patch so that sqlparse's parse()/format()/parsestream() also
-# use Rust.
+# This __init__.py re-exports tokenize/split/parse/format from the extension,
+# provides our own sql/tokens modules (no sqlparse dependency), and optionally
+# installs the lexer patch when sqlparse is available.
 
 from sqlparse_rs.sqlparse_rs import (  # noqa: F401
     tokenize,
@@ -11,22 +11,14 @@ from sqlparse_rs.sqlparse_rs import (  # noqa: F401
     format,
     __version__,
 )
-from sqlparse_rs._patch import install as _install_patch
 
-# Patch sqlparse's lexer automatically when sqlparse_rs is imported.
-_install_patch()
+# Our own pure-Python sql / tokens modules (no sqlparse dependency).
+from sqlparse_rs import sql    # noqa: F401
+from sqlparse_rs import tokens  # noqa: F401
 
-# Re-export sqlparse sub-modules so `import sqlparse_rs as sqlparse` is fully
-# self-contained — callers never need a bare `import sqlparse`.
-from sqlparse import (  # noqa: F401
-    sql,
-    tokens,
-    filters,
-    engine,
-    formatter,
-    keywords,
-    lexer,
-    utils,
-    exceptions,
-    parsestream,
-)
+# Optionally patch sqlparse's lexer if sqlparse is installed.
+try:
+    from sqlparse_rs._patch import install as _install_patch
+    _install_patch()
+except ImportError:
+    pass  # sqlparse not installed — patch is a no-op

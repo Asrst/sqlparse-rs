@@ -105,8 +105,8 @@ def test_parse_flatten():
     assert "FROM" in joined.upper()
 
 def test_parse_token_ttype():
-    """Tokens must have a .ttype attribute compatible with sqlparse.tokens."""
-    from sqlparse import tokens as T
+    """Tokens must have a .ttype attribute compatible with sqlparse_rs.tokens."""
+    from sqlparse_rs import tokens as T
     stmts = rs.parse("SELECT 1")
     flat = list(stmts[0].flatten())
     keywords = [t for t in flat if not t.is_whitespace and t.is_keyword]
@@ -268,11 +268,11 @@ def test_identifier_get_name():
 
 def test_where_clause_grouping():
     """WHERE clause is grouped into a Where node."""
-    import sqlparse.sql as sql_mod
+    import sqlparse_rs.sql as rs_sql
     stmts = rs.parse("SELECT a FROM t WHERE x = 1 AND y = 2")
     where_clauses = [
         tok for tok in stmts[0].tokens
-        if isinstance(tok, sql_mod.Where)
+        if isinstance(tok, rs_sql.Where)
     ]
     assert len(where_clauses) == 1
     assert "WHERE" in str(where_clauses[0]).upper()
