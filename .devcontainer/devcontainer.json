@@ -3,7 +3,7 @@
   "image": "mcr.microsoft.com/devcontainers/python:3.12-trixie",
   "features": {
     "ghcr.io/devcontainers/features/node:1": {
-      "version": "latest"
+      "version": "24"
     }
   },
   "customizations": {

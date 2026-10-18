@@ -9,6 +9,9 @@ cd "$WORKSPACE_ROOT"
 # Install opencode globally via npm
 npm install -g opencode-ai
 
+# Install IBM Bob Shell
+curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+
 # Verify opencode
 opencode --version
 
