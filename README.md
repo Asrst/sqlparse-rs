@@ -1,24 +1,19 @@
-
 # sqlparse-rs
 
 A Rust port of [python-sqlparse](https://github.com/andialbrecht/sqlparse) 0.6.0 exposed to Python
-via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement**.
+via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a single import.
 
 ## Status
 
 | Tier | Component | Status |
 |------|-----------|--------|
 | 1 | Lexer / tokenizer | ✅ Complete — 6.8× faster, byte-identical to sqlparse 0.6.0 |
-| 1 | Statement splitter (`split()`) | ✅ Complete — BEGIN/END blocks, GO, dollar-quotes, issues 762/809/826 |
+| 1 | Statement splitter (`split()`) | ✅ Complete — BEGIN/END blocks, GO, dollar-quotes |
 | 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
-| 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens; `parse()`/`format()` use Rust grouping (Tier 3) |
-| 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; `parse()`/`format()` no longer touch Python's grouping engine |
+| 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens, grouping, and formatter |
+| 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; no Python grouping engine |
 
-**Drop-in today:** `import sqlparse_rs` once (or at startup), then `import sqlparse` works
-unchanged — same `parse()`, `format()`, `split()`, `parsestream()`, `tokenize()` signatures.
-The Rust lexer is automatically wired into sqlparse's grouping and formatting engine.
-
-## Benchmark (Tier 1 — lexer + splitter)
+## Benchmark
 
 1.35 MB corpus, equal work asserted (103,800 tokens both sides), Rust release build:
 
@@ -28,10 +23,7 @@ The Rust lexer is automatically wired into sqlparse's grouping and formatting en
 | sqlparse-rs           | 0.114 s | 11.3 MB/s  |
 | **speedup**           | **~6.8×** |          |
 
-> Honest note: this is the correctness-first scanner. The ASCII fast-path / byte-level dispatch
-> version has obvious headroom; 10–50× is aspirational — quote the measured table above.
-
-## Quickstart
+## Installation
 
 ```bash
 # Rust toolchain (if not already installed)
@@ -39,53 +31,260 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 
 # Python deps
-pip install maturin pytest sqlparse==0.6.0
+pip install maturin sqlparse==0.6.0
 
-# Build and install into current venv
+# Build and install into current venv (run from repo root)
 maturin develop --release
-
-# Run all tests
-pytest tests/
-cargo test
 ```
 
-Requires Rust 1.75+ (tested with 1.99.1), Python 3.8+.
+Requires Rust 1.75+, Python 3.8+.
 
-## Usage (drop-in)
+## Quick usage
+
+`sqlparse_rs` is a **complete replacement** — one import, no changes to the rest of your code.
 
 ```python
-# One-time import at app startup (or in your conftest.py / __init__.py)
-import sqlparse_rs  # patches sqlparse's lexer automatically
+import sqlparse_rs as sqlparse
+```
 
-# Then use sqlparse exactly as before — no other changes needed
-import sqlparse
+That's it. Every `sqlparse` function and sub-module is available on `sqlparse_rs`.
 
-# split — uses Rust state-machine splitter
-sqlparse.split("SELECT 1; SELECT 2")
-# → ['SELECT 1', 'SELECT 2']
+---
 
-# parse — Python grouping/AST over Rust tokens
-stmts = sqlparse.parse("SELECT a, b FROM users WHERE id = 1")
-stmt = stmts[0]
-print(stmt.get_type())  # 'SELECT'
-for tok in stmt.flatten():
+### `split()` — split SQL into individual statements
+
+```python
+import sqlparse_rs as sqlparse
+
+sqlparse.split("SELECT 1; SELECT 2; SELECT 3")
+# → ['SELECT 1;', 'SELECT 2;', 'SELECT 3']
+```
+
+Handles dollar-quoted strings — inner `;` are never treated as statement boundaries:
+
+```python
+sqlparse.split("SELECT $$hello; world$$ AS x; SELECT 2")
+# → ['SELECT $$hello; world$$ AS x;', 'SELECT 2']
+```
+
+Handles `BEGIN...END` blocks — inner `;` are preserved:
+
+```python
+sql = """
+CREATE FUNCTION foo() RETURNS void AS $$
+BEGIN
+    UPDATE t SET x = 1;
+    UPDATE t SET y = 2;
+END;
+$$ LANGUAGE plpgsql;
+SELECT 1;
+"""
+sqlparse.split(sql)
+# → 2 statements: the CREATE FUNCTION and SELECT 1
+```
+
+---
+
+### `parse()` — parse into an AST
+
+```python
+import sqlparse_rs as sqlparse
+
+stmts = sqlparse.parse("SELECT id, name FROM users WHERE id = 1")
+stmt  = stmts[0]
+
+stmt.get_type()   # → 'SELECT'
+str(stmt)         # → 'SELECT id, name FROM users WHERE id = 1'
+```
+
+Works for all DML types:
+
+```python
+sqlparse.parse("SELECT a FROM b")[0].get_type()          # → 'SELECT'
+sqlparse.parse("INSERT INTO t VALUES (1)")[0].get_type() # → 'INSERT'
+sqlparse.parse("UPDATE t SET x=1")[0].get_type()         # → 'UPDATE'
+sqlparse.parse("DELETE FROM t WHERE id=1")[0].get_type() # → 'DELETE'
+```
+
+Flatten a statement to individual tokens:
+
+```python
+for tok in sqlparse.parse("SELECT id, name FROM users WHERE id = 1")[0].flatten():
     print(tok.ttype, repr(tok.value))
 
-# format — Python formatter over Rust tokens
-sqlparse.format("select a,b from t", keyword_case="upper", reindent=True)
-
-# low-level tokenize — direct Rust access
-import sqlparse_rs
-list(sqlparse_rs.tokenize("SELECT 1"))
-# → [('Token.Keyword.DML', 'SELECT'), ('Token.Text.Whitespace', ' '), ...]
+# Token.Keyword.DML   'SELECT'
+# Token.Text.Whitespace ' '
+# Token.Name          'id'
+# Token.Punctuation   ','
+# Token.Text.Whitespace ' '
+# Token.Name          'name'
+# Token.Text.Whitespace ' '
+# Token.Keyword       'FROM'
+# Token.Text.Whitespace ' '
+# Token.Name          'users'
+# Token.Text.Whitespace ' '
+# Token.Keyword       'WHERE'
+# Token.Text.Whitespace ' '
+# Token.Name          'id'
+# Token.Text.Whitespace ' '
+# Token.Operator.Comparison '='
+# Token.Text.Whitespace ' '
+# Token.Literal.Number.Integer '1'
 ```
+
+Access typed AST nodes via `sqlparse_rs.sql`:
+
+```python
+stmt = sqlparse.parse("SELECT a FROM t WHERE x = 1 AND y = 2")[0]
+
+# WHERE clause is grouped into a Where node
+where = [tok for tok in stmt.tokens if isinstance(tok, sqlparse.sql.Where)]
+str(where[0])   # → 'WHERE x = 1 AND y = 2'
+
+# Identifier alias
+stmt = sqlparse.parse("SELECT foo AS bar FROM users")[0]
+for id_ in stmt.get_sublists():
+    print(id_.get_name(), id_.get_alias())
+# bar  bar
+# users  None
+```
+
+CTEs and subqueries work as a single statement:
+
+```python
+sqlparse.parse("WITH cte AS (SELECT id FROM users) SELECT * FROM cte WHERE id > 5")[0].get_type()
+# → 'SELECT'
+
+sqlparse.parse("SELECT * FROM (SELECT a FROM b) sub")[0].get_type()
+# → 'SELECT'
+```
+
+---
+
+### `format()` — format SQL
+
+```python
+import sqlparse_rs as sqlparse
+
+# Reindent + uppercase keywords
+sqlparse.format(
+    "select id, name from users where id = 1 order by id",
+    reindent=True,
+    keyword_case="upper",
+)
+# → 'SELECT id, name\nFROM users\nWHERE id = 1\nORDER BY id'
+
+# Strip extra whitespace
+sqlparse.format("SELECT   a    FROM   b", strip_whitespace=True)
+# → 'SELECT a FROM b'
+
+# Strip comments
+sqlparse.format("SELECT a -- comment\nFROM b /* block */", strip_comments=True, strip_whitespace=True)
+# → 'SELECT a FROM b'
+
+# Lowercase keywords
+sqlparse.format("SELECT A FROM B WHERE X = 1", keyword_case="lower")
+# → 'select A from B where X = 1'
+
+# Lowercase identifiers
+sqlparse.format("SELECT MyCol FROM MyTable", identifier_case="lower")
+# → 'SELECT mycol FROM mytable'
+```
+
+---
+
+### `tokenize()` — raw token pairs
+
+Returns a list of `(token_type_string, value)` tuples — zero-copy, O(n), byte-identical to sqlparse:
+
+```python
+import sqlparse_rs as sqlparse
+
+sqlparse.tokenize("SELECT id, name FROM users WHERE id = 1")
+# → [
+#     ('Token.Keyword.DML',            'SELECT'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Name',                   'id'),
+#     ('Token.Punctuation',            ','),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Name',                   'name'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Keyword',                'FROM'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Name',                   'users'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Keyword',                'WHERE'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Name',                   'id'),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Operator.Comparison',    '='),
+#     ('Token.Text.Whitespace',        ' '),
+#     ('Token.Literal.Number.Integer', '1'),
+# ]
+```
+
+---
+
+### `parsestream()` — parse a stream of statements
+
+```python
+import sqlparse_rs as sqlparse
+
+stmts = list(sqlparse.parsestream("SELECT 1; INSERT INTO t VALUES (2); DELETE FROM t WHERE id = 3"))
+# → 3 Statement objects
+
+for s in stmts:
+    print(s.get_type(), repr(str(s).strip()))
+# SELECT  'SELECT 1;'
+# INSERT  'INSERT INTO t VALUES (2);'
+# DELETE  'DELETE FROM t WHERE id = 3'
+```
+
+Also accepts a file-like object:
+
+```python
+import io
+stmts = list(sqlparse.parsestream(io.StringIO("SELECT 1; SELECT 2")))
+```
+
+---
+
+### Sub-modules
+
+All `sqlparse` sub-modules are re-exported — no `import sqlparse` ever needed:
+
+```python
+import sqlparse_rs as sqlparse
+
+sqlparse.sql          # AST node classes: Statement, Where, Identifier, ...
+sqlparse.tokens       # Token type constants: tokens.Keyword, tokens.Keyword.DML, ...
+sqlparse.filters      # Filter pipeline
+sqlparse.engine       # Grouping engine
+sqlparse.formatter    # Formatter internals
+sqlparse.keywords     # Keyword tables
+sqlparse.lexer        # Lexer (Rust-patched)
+sqlparse.utils        # Utility helpers
+sqlparse.exceptions   # Exception classes
+```
+
+Example using token type constants:
+
+```python
+import sqlparse_rs as sqlparse
+
+sqlparse.tokens.Keyword              # → Token.Keyword
+sqlparse.tokens.Keyword.DML          # → Token.Keyword.DML
+sqlparse.tokens.Literal.Number.Integer  # → Token.Literal.Number.Integer
+```
+
+---
 
 ## Repo layout
 
 ```
 pyproject.toml                maturin build config (mixed Rust/Python layout)
 python/sqlparse_rs/
-  __init__.py               re-exports tokenize/split, installs Rust lexer patch
+  __init__.py               re-exports tokenize/split/parse/format + all sub-modules
   _patch.py                 monkey-patches sqlparse.lexer.Lexer.get_tokens
 crates/sqlparse-core/src/
   ttype.rs                  &'static str token type constants
@@ -96,7 +295,7 @@ crates/sqlparse-core/src/
   lib.rs                    pub use lexer::tokenize, splitter::split
 crates/sqlparse-py/src/lib.rs   PyO3 glue; exposes tokenize()+split() as sqlparse_rs
 tests/
-  test_compat.py            compatibility tests vs sqlparse (45 tests)
+  test_compat.py            45 compatibility tests vs sqlparse
   test_wrapper.py           Rust parity vs real sqlparse, byte-identical
 corpus/sql/                 24 fixture files (committed)
 corpus/goldens.txt          committed tokenize goldens (real sqlparse 0.6.0)
@@ -141,28 +340,36 @@ make check
 cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 ```
 
-## What was hard (and is now covered by tests)
+## Implementation notes & known edges
 
-- Comments CONSUME their trailing newline (`m.group()` includes the terminator); `#` is a
-  comment only when followed by a space; `--+`/`# +` are the hint variants.
-- Number rules backtrack: `1.5x` → `Float "1."` + `Name "5x"`; `12abc` → `Integer "1"` + `Name "2abc"`.
-- Unclosed strings/quotes do NOT swallow to EOF — the quote becomes `Error`, rest lexes normally.
-- Word continuation includes `$` and `#`: `a#>>b` is `Name "a#"` + `>>`.
-- Rule 13 (`CASE|IN|VALUES|USING|FROM|AS`) fires BEFORE the word rule — `FROM` is plain `Keyword`.
-- Rule 16 (lookbehind) IS alive: `t.select` → the `select` part is `Token.Name`.
-- `find_delimited_spans` collects openers and closers in independent passes.
-- `split()` strips every statement; `CASE` does NOT protect `;` — only `BEGIN...END` blocks do.
-- `BEGIN TRANSACTION`/`BEGIN WORK` must NOT open a block (issue826).
+### Covered by tests — non-obvious sqlparse quirks
 
-## Honest limitations
+- **Comments consume their trailing newline** — `m.group()` includes the terminator. `#` is only a
+  comment when followed by a space; `--+` and `# +` are the MySQL/hint variants.
+- **Number rules backtrack**: `1.5x` → `Float "1."` + `Name "5x"`; `12abc` → `Integer "1"` + `Name "2abc"`.
+- **Unclosed strings do not swallow to EOF** — the opening quote becomes `Error`, the rest lexes normally.
+- **Word continuation includes `$` and `#`**: `a#>>b` is `Name "a#"` + operator `>>`.
+- **Rule 13 fires before the word rule** — `CASE|IN|VALUES|USING|FROM|AS` are always plain `Keyword`,
+  never `Name`, regardless of context.
+- **Rule 16 (lookbehind) is active**: `t.select` → the `select` part is `Token.Name`, not `Keyword`.
+- **`split()` strips every statement**; `CASE...END` does NOT protect `;` — only `BEGIN...END` blocks do.
+- **`BEGIN TRANSACTION` / `BEGIN WORK`** must not open a block — only bare `BEGIN` does (issue826).
 
-- **`import sqlparse_rs` must precede the first `import sqlparse`** for the Rust lexer to be
-  active. In practice: add it to your `conftest.py`, app `__init__.py`, or entry-point.
-- Unicode: Python `re` `\w`/`\d` semantics approximated (`is_alphanumeric`/`is_numeric`);
-  combining marks may differ on exotic NFD input. ASCII SQL is unaffected.
-- `Lexer.add_keywords()` runtime customisation not exposed — regenerate `keywords.rs` instead.
-- `parsestream()` still uses Python's `FilterStack`/`StatementSplitter` internally; only `parse()` and `format()` are fully Rust.
-- `reindent_aligned` and `right_margin` format options fall back to Python sqlparse (rare options).
+### Limitations
+
+- **`import sqlparse_rs` must happen before you need Rust to be active.** The patch replaces
+  `sqlparse.parse` and `sqlparse.format` at import time, so any calls made after `import sqlparse_rs`
+  use Rust even if `import sqlparse` ran first. Place it in `conftest.py`, your app `__init__.py`,
+  or any entry-point — just not after another library has already cached a direct reference to the
+  original functions.
+- **`Lexer.add_keywords()` calls are silently ignored by the Rust scanner.** The Python `Lexer`
+  instance still stores the entries, but the Rust scanner uses its compiled keyword table
+  (`keywords.rs`). To add keywords permanently, regenerate `keywords.rs` with `make gen-keywords`.
+- **`reindent_aligned` and `right_margin` format options are unimplemented** — both return the SQL
+  unchanged. This matches real sqlparse too; they are no-ops in both implementations.
+- **Unicode:** Rust uses `char::is_alphanumeric` / `char::is_numeric` to approximate Python `re`
+  `\w`/`\d` semantics. Common Unicode identifiers (`中文`, `café`, `ß`) work correctly; exotic NFD
+  combining marks may produce different token boundaries on malformed input.
 
 ## License
 

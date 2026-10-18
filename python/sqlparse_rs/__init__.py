@@ -15,3 +15,18 @@ from sqlparse_rs._patch import install as _install_patch
 
 # Patch sqlparse's lexer automatically when sqlparse_rs is imported.
 _install_patch()
+
+# Re-export sqlparse sub-modules so `import sqlparse_rs as sqlparse` is fully
+# self-contained — callers never need a bare `import sqlparse`.
+from sqlparse import (  # noqa: F401
+    sql,
+    tokens,
+    filters,
+    engine,
+    formatter,
+    keywords,
+    lexer,
+    utils,
+    exceptions,
+    parsestream,
+)
