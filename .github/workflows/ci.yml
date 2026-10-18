@@ -84,12 +84,11 @@ jobs:
         with:
           command: build
           args: >-
-            --manifest-path crates/sqlparse-py/Cargo.toml
             --out dist
             --find-interpreter
 
       - name: Install wheel
-        run: pip install dist/*.whl --no-index --find-links dist/
+        run: pip install sqlparse-rs --no-index --find-links dist/
 
       - name: Run Python tests
         run: pytest tests/ -v --tb=short --cov=sqlparse_rs --cov-report=xml
@@ -135,12 +134,11 @@ jobs:
         with:
           command: build
           args: >-
-            --manifest-path crates/sqlparse-py/Cargo.toml
             --out dist
             --find-interpreter
 
       - name: Install wheel
-        run: pip install dist/*.whl --no-index --find-links dist/
+        run: pip install sqlparse-rs --no-index --find-links dist/
 
       - name: Run parity and wrapper tests
         run: pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
@@ -172,7 +170,6 @@ jobs:
         with:
           command: build
           args: >-
-            --manifest-path crates/sqlparse-py/Cargo.toml
             --release
             --out dist
             --find-interpreter
@@ -212,7 +209,6 @@ jobs:
         with:
           command: build
           args: >-
-            --manifest-path crates/sqlparse-py/Cargo.toml
             --release
             --out dist
             --find-interpreter
