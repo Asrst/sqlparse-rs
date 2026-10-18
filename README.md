@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Asrst/sqlparse-rs/branch/main/graph/badge.svg)](https://codecov.io/gh/Asrst/sqlparse-rs)
-[![Python](https://img.shields.io/badge/python-3.12-blue)](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%20|%203.12%20|%203.13-blue)](https://github.com/Asrst/sqlparse-rs/actions/workflows/ci.yml)
 [![License: BSD-3](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](LICENSE)
 [![Typed](https://img.shields.io/badge/typing-py.typed-informational)](python/sqlparse_rs/py.typed)
 
@@ -85,7 +85,7 @@ pip install maturin
 maturin develop --release
 ```
 
-Requires **Rust 1.75+** and **Python 3.12+**.
+Requires **Rust 1.75+** and **Python 3.11+**.
 
 ---
 

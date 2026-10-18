@@ -6,16 +6,13 @@ build-backend = "maturin"
 name = "sqlparse-rs"
 version = "0.1.0b1"
 description = "Drop-in Rust replacement for sqlparse — byte-identical tokenize and split, linear time"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = { text = "BSD-3-Clause" }
 keywords = ["sql", "parser", "formatter", "rust"]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -33,10 +30,6 @@ dev = ["pytest", "sqlparse>=0.4,<0.7", "maturin>=1.5,<2", "mypy>=1.0"]
 manifest-path = "crates/sqlparse-py/Cargo.toml"
 module-name = "sqlparse_rs"
 python-source = "python"
-# Include the py.typed PEP 561 marker so type-checkers recognise the package.
-include = [
-    { path = "python/sqlparse_rs/py.typed", format = "wheel" },
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
