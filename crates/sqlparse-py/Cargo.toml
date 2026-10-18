@@ -1,0 +1,14 @@
+[package]
+name = "sqlparse-py"
+version = "0.1.0"
+edition = "2021"
+description = "PyO3 wrapper: drop-in accelerate sqlparse hot paths (tokenize, split)"
+license = "BSD-3-Clause"
+
+[lib]
+name = "sqlparse_rs"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+sqlparse-core = { path = "../sqlparse-core" }
+pyo3 = { version = "0.23", features = ["extension-module"] }

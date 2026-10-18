@@ -1,0 +1,13 @@
+[package]
+name = "sqlparse-core"
+version = "0.1.0"
+edition = "2021"
+description = "Linear-time, backtracking-free SQL lexer and statement splitter ported from python-sqlparse 0.6.0"
+license = "BSD-3-Clause"
+
+# Deliberately dependency-free: hand-written scanner, no regex crate in the
+# token path, no unsafe. Tests parse goldens with std only.
+[dependencies]
+
+[lib]
+name = "sqlparse_core"

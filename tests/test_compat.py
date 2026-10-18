@@ -173,17 +173,16 @@ def test_format_identifier_case_lower():
 # ─── tokenize ─────────────────────────────────────────────────────────────
 
 def test_tokenize_returns_pairs():
-    from sqlparse._rust import tokenize
-    tokens = list(tokenize("SELECT 1"))
+    import sqlparse_rs
+    tokens = list(sqlparse_rs.tokenize("SELECT 1"))
     assert len(tokens) > 0
     for ttype, val in tokens:
         assert isinstance(val, str)
 
 def test_tokenize_finds_dml():
-    from sqlparse._rust import tokenize
-    from sqlparse import tokens as T
-    pairs = list(tokenize("SELECT 1"))
-    ttypes = [str(tt) for tt, _ in pairs]
+    import sqlparse_rs
+    pairs = list(sqlparse_rs.tokenize("SELECT 1"))
+    ttypes = [tt for tt, _ in pairs]
     assert any("DML" in t for t in ttypes)
 
 # ─── parsestream ──────────────────────────────────────────────────────────

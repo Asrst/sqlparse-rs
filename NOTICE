@@ -1,0 +1,14 @@
+sqlparse-rs
+===========
+
+This project is a behavioral Rust port of the hot paths (lexer, statement
+splitter) of python-sqlparse 0.6.0:
+
+  https://github.com/andialbrecht/sqlparse  (BSD 3-Clause)
+
+The port was derived from the upstream source to be output-compatible:
+byte-identical token streams and statement splits are asserted by the
+differential test suite against the reference Python implementation.
+Keyword tables are generated from the reference implementation's data.
+This distribution is not endorsed by, or affiliated with, the
+python-sqlparse project.

@@ -1,0 +1,2 @@
+CASE IN VALUES USING FROM AS case in values using from as
+SELECT x FROM t WHERE a IN (1,2) USING DEFAULT;
