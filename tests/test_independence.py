@@ -21,11 +21,17 @@ package is used.
 import os
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "python"
-_HAS_SRC_SO = any(SRC.glob("sqlparse_rs/sqlparse_rs.*.so"))
+# Check for an ABI-compatible .so — match the exact extension suffix for the
+# running interpreter (e.g. ".cpython-312-x86_64-linux-gnu.so") so that a
+# cp312 artifact committed or left over from a different build does not fool
+# this test when running under Python 3.9 or 3.11.
+_EXT_SUFFIX = sysconfig.get_config_var("EXT_SUFFIX") or ""
+_HAS_SRC_SO = (SRC / "sqlparse_rs" / f"sqlparse_rs{_EXT_SUFFIX}").exists()
 RS_ENV = {**os.environ}
 if _HAS_SRC_SO:
     # Dev layout: the built .so lives next to the Python source tree.
