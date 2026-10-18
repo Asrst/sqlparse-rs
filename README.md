@@ -12,6 +12,7 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a si
 | 2 | Drop-in `import sqlparse` shim | ✅ Complete — Rust lexer patched into sqlparse's engine |
 | 2 | `parse()` / `format()` / `parsestream()` | ✅ Complete — Rust tokens, grouping, and formatter |
 | 3 | Full Rust grouping + formatter | ✅ Complete — Rust AST grouping + formatter; no Python grouping engine |
+| 3 | Own `sql` / `tokens` modules | ✅ Complete — no `sqlparse` runtime dependency |
 
 ## Benchmark
 
@@ -30,21 +31,19 @@ via [PyO3](https://github.com/PyO3/pyo3) — a **drop-in replacement** with a si
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 
-# Python deps
-pip install maturin sqlparse==0.6.0
-
-# Build and install into current venv (run from repo root)
+# Install — no sqlparse runtime dep required
+pip install maturin
 maturin develop --release
 ```
 
 Requires Rust 1.75+, Python 3.8+.
 
-> **Why is `sqlparse` required?** `sqlparse_rs` is an accelerator, not a full replacement of
-> sqlparse's Python layer. `parse()` returns `sqlparse.sql.Statement` objects (Python classes
-> from the real package), `format()` uses sqlparse's formatter infrastructure, and
-> `import sqlparse_rs as sqlparse` re-exports sqlparse's sub-modules directly. The pure-Rust
-> functions `tokenize()` and `split()` work without sqlparse, but everything else depends on it
-> at runtime. `sqlparse==0.6.0` is a hard runtime dependency.
+> **`sqlparse` is now a dev-only dependency.** `sqlparse_rs` ships its own
+> `sqlparse_rs.sql` and `sqlparse_rs.tokens` modules (pure Python, zero external
+> deps). `parse()` returns `sqlparse_rs.sql.Statement` objects; `tokenize()` /
+> `split()` / `format()` are entirely Rust. The optional `_patch.py` can still
+> monkey-patch a real `sqlparse` install when present, but nothing in the runtime
+> path requires it.
 
 ## Quick usage
 
@@ -142,14 +141,16 @@ for tok in sqlparse.parse("SELECT id, name FROM users WHERE id = 1")[0].flatten(
 Access typed AST nodes via `sqlparse_rs.sql`:
 
 ```python
-stmt = sqlparse.parse("SELECT a FROM t WHERE x = 1 AND y = 2")[0]
+import sqlparse_rs.sql as sql
+
+stmt = sqlparse_rs.parse("SELECT a FROM t WHERE x = 1 AND y = 2")[0]
 
 # WHERE clause is grouped into a Where node
-where = [tok for tok in stmt.tokens if isinstance(tok, sqlparse.sql.Where)]
+where = [tok for tok in stmt.tokens if isinstance(tok, sql.Where)]
 str(where[0])   # → 'WHERE x = 1 AND y = 2'
 
 # Identifier alias
-stmt = sqlparse.parse("SELECT foo AS bar FROM users")[0]
+stmt = sqlparse_rs.parse("SELECT foo AS bar FROM users")[0]
 for id_ in stmt.get_sublists():
     print(id_.get_name(), id_.get_alias())
 # bar  bar
@@ -159,10 +160,10 @@ for id_ in stmt.get_sublists():
 CTEs and subqueries work as a single statement:
 
 ```python
-sqlparse.parse("WITH cte AS (SELECT id FROM users) SELECT * FROM cte WHERE id > 5")[0].get_type()
+sqlparse_rs.parse("WITH cte AS (SELECT id FROM users) SELECT * FROM cte WHERE id > 5")[0].get_type()
 # → 'SELECT'
 
-sqlparse.parse("SELECT * FROM (SELECT a FROM b) sub")[0].get_type()
+sqlparse_rs.parse("SELECT * FROM (SELECT a FROM b) sub")[0].get_type()
 # → 'SELECT'
 ```
 
@@ -234,6 +235,9 @@ sqlparse.tokenize("SELECT id, name FROM users WHERE id = 1")
 
 ### `parsestream()` — parse a stream of statements
 
+> **Requires `sqlparse`** (dev dependency). `parsestream()` delegates to sqlparse's filter-stack
+> engine with the Rust lexer patched in.
+
 ```python
 import sqlparse_rs as sqlparse
 
@@ -258,31 +262,48 @@ stmts = list(sqlparse.parsestream(io.StringIO("SELECT 1; SELECT 2")))
 
 ### Sub-modules
 
-All `sqlparse` sub-modules are re-exported — no `import sqlparse` ever needed:
+`sqlparse_rs` ships its own `sql` and `tokens` modules — no `import sqlparse` ever needed:
 
 ```python
-import sqlparse_rs as sqlparse
+import sqlparse_rs
 
-sqlparse.sql          # AST node classes: Statement, Where, Identifier, ...
-sqlparse.tokens       # Token type constants: tokens.Keyword, tokens.Keyword.DML, ...
-sqlparse.filters      # Filter pipeline
-sqlparse.engine       # Grouping engine
-sqlparse.formatter    # Formatter internals
-sqlparse.keywords     # Keyword tables
-sqlparse.lexer        # Lexer (Rust-patched)
-sqlparse.utils        # Utility helpers
-sqlparse.exceptions   # Exception classes
+sqlparse_rs.sql       # AST node classes: Statement, Where, Identifier, ...
+sqlparse_rs.tokens    # Token type constants: tokens.Keyword, tokens.Keyword.DML, ...
 ```
 
-Example using token type constants:
+Token type constants work identically to `sqlparse.tokens`:
 
 ```python
-import sqlparse_rs as sqlparse
+from sqlparse_rs import tokens as T
 
-sqlparse.tokens.Keyword              # → Token.Keyword
-sqlparse.tokens.Keyword.DML          # → Token.Keyword.DML
-sqlparse.tokens.Literal.Number.Integer  # → Token.Literal.Number.Integer
+T.Keyword              # → Token.Keyword
+T.Keyword.DML          # → Token.Keyword.DML
+T.DML in T.Keyword     # → True  (containment / hierarchy)
+T.Newline in T.Whitespace  # → True
+T.Literal.Number.Integer   # → Token.Literal.Number.Integer
 ```
+
+AST node classes from `sqlparse_rs.sql`:
+
+```python
+from sqlparse_rs import sql
+
+sql.Token          # leaf token
+sql.TokenList      # base group
+sql.Statement      # top-level statement
+sql.Identifier     # bare name, quoted name, name AS alias
+sql.IdentifierList # comma-separated identifiers
+sql.Where          # WHERE ... clause
+sql.Comparison     # lhs <op> rhs
+sql.Function       # name(...)
+sql.Parenthesis    # (...)
+sql.Case           # CASE...END
+sql.Comment        # comment block
+sql.Begin          # BEGIN...END block
+```
+
+When `sqlparse` is installed, `import sqlparse_rs` also patches its lexer so
+`sqlparse.parse()` / `sqlparse.format()` use Rust automatically.
 
 ---
 
@@ -291,8 +312,10 @@ sqlparse.tokens.Literal.Number.Integer  # → Token.Literal.Number.Integer
 ```
 pyproject.toml                maturin build config (mixed Rust/Python layout)
 python/sqlparse_rs/
-  __init__.py               re-exports tokenize/split/parse/format + all sub-modules
-  _patch.py                 monkey-patches sqlparse.lexer.Lexer.get_tokens
+  __init__.py               re-exports tokenize/split/parse/format; optional sqlparse patch
+  _patch.py                 optional monkey-patch of sqlparse.lexer.Lexer.get_tokens
+  sql.py                    pure-Python AST node classes (no sqlparse dep)
+  tokens.py                 pure-Python _TokenType hierarchy (no sqlparse dep)
 crates/sqlparse-core/src/
   ttype.rs                  &'static str token type constants
   keywords.rs               GENERATED 803-entry keyword map + binary search
@@ -300,9 +323,10 @@ crates/sqlparse-core/src/
   spans.rs                  find_delimited_spans prepass ($-quotes, /* */ hints)
   splitter.rs               statement_splitter.py port; state machine
   lib.rs                    pub use lexer::tokenize, splitter::split
-crates/sqlparse-py/src/lib.rs   PyO3 glue; exposes tokenize()+split() as sqlparse_rs
+crates/sqlparse-py/src/lib.rs   PyO3 glue; exposes tokenize()+split()+parse()+format()
 tests/
   test_compat.py            45 compatibility tests vs sqlparse
+  test_native.py            22 standalone tests (no sqlparse dep)
   test_wrapper.py           Rust parity vs real sqlparse, byte-identical
 corpus/sql/                 24 fixture files (committed)
 corpus/goldens.txt          committed tokenize goldens (real sqlparse 0.6.0)
@@ -322,11 +346,14 @@ maturin develop
 # Build optimised release .so
 maturin develop --release
 
-# All Python tests
+# All Python tests (67 total)
 pytest tests/ -v
 
 # Single Python test
 pytest tests/test_compat.py::test_split_begin_end_not_split -v
+
+# Standalone tests (no sqlparse required)
+pytest tests/test_native.py -v
 
 # All Rust tests (unit + differential parity)
 cargo test -p sqlparse-core
@@ -364,14 +391,8 @@ cargo run --release -p sqlparse-core --bin bench < corpus/inputs.bin
 
 ### Limitations
 
-- **`import sqlparse_rs` must happen before you need Rust to be active.** The patch replaces
-  `sqlparse.parse` and `sqlparse.format` at import time, so any calls made after `import sqlparse_rs`
-  use Rust even if `import sqlparse` ran first. Place it in `conftest.py`, your app `__init__.py`,
-  or any entry-point — just not after another library has already cached a direct reference to the
-  original functions.
-- **`Lexer.add_keywords()` calls are silently ignored by the Rust scanner.** The Python `Lexer`
-  instance still stores the entries, but the Rust scanner uses its compiled keyword table
-  (`keywords.rs`). To add keywords permanently, regenerate `keywords.rs` with `make gen-keywords`.
+- **`parsestream()` requires `sqlparse`.** It delegates to sqlparse's filter-stack engine with the
+  Rust lexer patched in. `split()`, `parse()`, `format()`, and `tokenize()` have no such dependency.
 - **`reindent_aligned` and `right_margin` format options are unimplemented** — both return the SQL
   unchanged. This matches real sqlparse too; they are no-ops in both implementations.
 - **Unicode:** Rust uses `char::is_alphanumeric` / `char::is_numeric` to approximate Python `re`
