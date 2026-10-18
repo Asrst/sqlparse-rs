@@ -55,10 +55,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -73,14 +76,18 @@ jobs:
           key: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-
 
-      - name: Install Python dependencies
-        run: pip install maturin pytest sqlparse
+      - name: Create venv and install dependencies
+        run: |
+          uv venv --python ${{ matrix.python-version }} .venv
+          uv pip install --python .venv/bin/python maturin pytest sqlparse
 
       - name: Build and install (debug)
-        run: maturin build --out dist/ && pip install dist/*.whl
+        run: |
+          .venv/bin/maturin build --out dist/
+          uv pip install --python .venv/bin/python dist/*.whl
 
       - name: Run Python tests
-        run: pytest tests/ -v --tb=short
+        run: .venv/bin/pytest tests/ -v --tb=short
 
   # ── Parity gate: byte-identical output vs real sqlparse ────────────────────
   parity:
@@ -89,10 +96,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -107,14 +117,18 @@ jobs:
           key: ${{ runner.os }}-parity-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-parity-cargo-
 
-      - name: Install dependencies
-        run: pip install maturin "sqlparse==0.6.0" pytest
+      - name: Create venv and install dependencies
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python maturin "sqlparse==0.6.0" pytest
 
       - name: Build and install
-        run: maturin build --out dist/ && pip install dist/*.whl
+        run: |
+          .venv/bin/maturin build --out dist/
+          uv pip install --python .venv/bin/python dist/*.whl
 
       - name: Run parity and wrapper tests
-        run: pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
+        run: .venv/bin/pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
 
       - name: Upload parity report
         if: always()
@@ -130,19 +144,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
         with:
-          python-version: "3.12"
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install maturin
-        run: pip install maturin
+      - name: Create venv and install maturin
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python maturin
 
       - name: Build release wheel
-        run: maturin build --release --out dist/
+        run: .venv/bin/maturin build --release --out dist/
 
       - name: Upload wheel artifact
         uses: actions/upload-artifact@v4

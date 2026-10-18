@@ -28,7 +28,15 @@ SRC = REPO / "python"
 _HAS_SRC_SO = any(SRC.glob("sqlparse_rs/sqlparse_rs.*.so"))
 RS_ENV = {**os.environ}
 if _HAS_SRC_SO:
+    # Dev layout: the built .so lives next to the Python source tree.
+    # Point subprocesses at the source tree so they find the extension.
     RS_ENV["PYTHONPATH"] = str(SRC)
+else:
+    # Installed-wheel layout (e.g. CI after `pip install dist/*.whl`):
+    # the package is in site-packages.  Strip any inherited PYTHONPATH that
+    # might contain the bare source tree (which has no .so and would cause
+    # "No module named 'sqlparse_rs.sqlparse_rs'" in subprocesses).
+    RS_ENV.pop("PYTHONPATH", None)
 
 
 def _run(code, env=None):

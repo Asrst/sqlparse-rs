@@ -1,4 +1,4 @@
-PY      ?= python3
+PY      ?= uv run python
 CORPUS  := corpus
 INPUTS  := $(CORPUS)/inputs.bin
 GOLDENS := $(CORPUS)/goldens.txt
@@ -37,7 +37,7 @@ build-py:
 
 ## Python-side tests (wrapper + parity vs sqlparse)
 test-py: build-py
-	$(PY) -m pytest tests/test_wrapper.py -q
+	uv run pytest tests/test_wrapper.py -q
 
 bench-py: $(INPUTS)
 	$(PY) tools/oracle.py tokenize < $(INPUTS) > /dev/null
@@ -51,7 +51,7 @@ clean:
 
 ## Proof 1: python live-vs-live parity gate (writes tests/parity-report.md)
 proof-parity: build-py
-	$(PY) -m pytest tests/test_parity.py -q
+	uv run pytest tests/test_parity.py -q
 
 ## Proof 1: regenerate dialect sweep + adversarial corpus records
 sweep:
@@ -66,12 +66,12 @@ fuzz-check:
 
 ## Proof 2: batch benchmarks (writes benchmarks/results.csv)
 bench: build-py
-	$(PY) benchmarks/bench.py
+	uv run python benchmarks/bench.py
 
 ## Proof 3: adversarial scaling plot (writes benchmarks/scaling.png)
 scaling: build-py
-	$(PY) benchmarks/scaling.py
+	uv run python benchmarks/scaling.py
 
 ## Proof 4: downstream integration (writes tests/downstream-report.md)
 downstream: build-py
-	$(PY) tools/run_downstream.py
+	uv run python tools/run_downstream.py

@@ -26,6 +26,9 @@ classifiers = [
 [project.optional-dependencies]
 dev = ["pytest", "sqlparse>=0.4,<0.7"]
 
+[dependency-groups]
+dev = ["pytest", "sqlparse>=0.4,<0.7", "maturin>=1.5,<2", "mypy>=1.0"]
+
 [tool.maturin]
 manifest-path = "crates/sqlparse-py/Cargo.toml"
 module-name = "sqlparse_rs"
