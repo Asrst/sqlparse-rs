@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  # Keep incremental compilation artifacts between runs
+  CARGO_INCREMENTAL: 1
+
+jobs:
+  # ── Rust tests (no Python needed) ──────────────────────────────────────────
+  rust:
+    name: Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: cargo fmt --check -p sqlparse-core
+
+      - name: Clippy
+        run: cargo clippy -p sqlparse-core -- -D warnings
+
+      - name: Run Rust tests
+        run: cargo test -p sqlparse-core
+
+  # ── Python tests (requires maturin build) ──────────────────────────────────
+  python:
+    name: Python tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-py${{ matrix.python-version }}-cargo-
+
+      - name: Install Python dependencies
+        run: pip install maturin pytest sqlparse
+
+      - name: Build and install (debug)
+        run: maturin develop
+
+      - name: Run Python tests
+        run: pytest tests/ -v --tb=short
+
+  # ── Parity gate: byte-identical output vs real sqlparse ────────────────────
+  parity:
+    name: Parity gate (sqlparse 0.6.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-parity-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-parity-cargo-
+
+      - name: Install dependencies
+        run: pip install maturin "sqlparse==0.6.0" pytest
+
+      - name: Build and install
+        run: maturin develop
+
+      - name: Run parity and wrapper tests
+        run: pytest tests/test_parity.py tests/test_wrapper.py -v --tb=short
+
+      - name: Upload parity report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-report
+          path: tests/parity-report.md
+
+  # ── Build wheel (smoke test, no upload) ────────────────────────────────────
+  build-wheel:
+    name: Build wheel (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install maturin
+        run: pip install maturin
+
+      - name: Build release wheel
+        run: maturin build --release --out dist/
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheel-linux-x86_64
+          path: dist/*.whl
+          retention-days: 7
